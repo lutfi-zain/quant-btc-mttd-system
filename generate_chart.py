@@ -30,8 +30,12 @@ def load_data():
     btc = btc.set_index('time')
     btc = btc[btc.index >= '2018-01-01']
     
-    # Load MTTD data
-    with open('mttd_data.json') as f:
+    # Load MTTD data (check both locations)
+    mttd_path = 'mttd_data.json'
+    if not os.path.exists(mttd_path):
+        mttd_path = 'mttd/mttd_data.json'
+    
+    with open(mttd_path) as f:
         mttd_data = json.load(f)
     
     return btc, mttd_data
