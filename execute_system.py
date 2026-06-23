@@ -174,11 +174,16 @@ def detect_direction_series(res_df):
     # For single-column indicators, interpret positive values as bullish
     if len(res_df.columns) == 1:
         col = res_df.columns[0]
-        return res_df[col].apply(lambda x: 1.0 if x > 0 else -1.0 if x < 0 else 0.0)
+        # Forward fill NaN values before applying direction logic
+        filled = res_df[col].ffill().fillna(0.0)
+        return filled.apply(lambda x: 1.0 if x > 0 else -1.0 if x < 0 else 0.0)
     
     # For two-column indicators with dema_atr and moving_average
     if 'dema_atr' in res_df.columns and 'moving_average' in res_df.columns:
-        return (res_df['dema_atr'] > res_df['moving_average']).astype(float) * 2 - 1
+        # Forward fill NaN values
+        dema_filled = res_df['dema_atr'].ffill().fillna(0.0)
+        ma_filled = res_df['moving_average'].ffill().fillna(0.0)
+        return (dema_filled > ma_filled).astype(float) * 2 - 1
     
     return None
 
@@ -341,8 +346,13 @@ def main():
 
         indicator_values = []
         for i, (date_str, val) in enumerate(raw_vals.items()):
-            sig = 1.0 if dir_series.iloc[i] > 0 else -1.0
-            color = '#10b981' if sig > 0 else '#f43f5e'
+            # Use direction series for color, but handle NaN/0 as neutral (use close price color)
+            dir_val = dir_series.iloc[i] if i < len(dir_series) else 0.0
+            if pd.isna(dir_val) or dir_val == 0.0:
+                # Neutral - use previous color or default green
+                color = '#10b981' if i == 0 else (indicator_values[-1]['color'] if indicator_values else '#10b981')
+            else:
+                color = '#10b981' if dir_val > 0 else '#f43f5e'
             clamped_val = max(-8e13, min(8e13, clean_value(val)))
             indicator_values.append({
                 'time': date_str,
