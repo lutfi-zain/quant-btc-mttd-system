@@ -87,6 +87,10 @@ def kalman_filtered_rsi_oscillator(
     highest_rsi = highest(rsi_val, 100)
     normalized_rsi = (rsi_val - lowest_rsi) / (highest_rsi - lowest_rsi) - 0.5
     
+    # Direction: 1 (bullish) if normalized RSI > 0 (RSI > 50%), -1 (bearish) if <= 0
+    direction = normalized_rsi.apply(lambda x: 1.0 if x > 0 else -1.0 if not pd.isna(x) else 0.0)
+
     return pd.DataFrame({
-        'kalman_rsi': normalized_rsi
+        'kalman_rsi': normalized_rsi,
+        'direction': direction
     }, index=df.index)

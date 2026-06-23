@@ -73,6 +73,18 @@ def dema_adjusted_average_true_range(df: pd.DataFrame,
 
     dema_atr = pd.Series(dema_atr_vals, index=df.index)
 
+    # Direction: 1 (bullish) if current DEMA >= trailing stop, -1 (bearish) if below
+    direction = pd.Series(0.0, index=df.index)
+    for i in range(len(df)):
+        d_out = dema_out_vals[i]
+        d_atr = dema_atr_vals[i]
+        if np.isnan(d_out) or np.isnan(d_atr):
+            direction.iloc[i] = 0.0
+        elif d_out >= d_atr:
+            direction.iloc[i] = 1.0
+        else:
+            direction.iloc[i] = -1.0
+
     # Calculate Moving Average switch
     def moving_average(src: pd.Series, length: int, ma_type: str) -> pd.Series:
         ma_type = ma_type.upper()
@@ -93,6 +105,7 @@ def dema_adjusted_average_true_range(df: pd.DataFrame,
 
     results = pd.DataFrame(index=df.index)
     results['dema_atr'] = dema_atr
+    results['direction'] = direction
     results['moving_average'] = ma_out
 
     return results
