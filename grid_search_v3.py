@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-MTTD Grid Search V2 — HOLDOUT VERSION
-======================================
+MTTD Grid Search V3 — REDUCED INDICATOR SET
+=============================================
 
-Optimize indicator parameters using 2018-2024 data only.
-Reserve 2025-2026 as holdout period for final validation.
+Uses only 4 indicators with genuine factor diversification:
+1. Adaptive Regime Cloud (regime detection)
+2. Kalman RSI (momentum)
+3. ALMA Lag (trend direction)
+4. RMSD Trend (trend quality + volatility)
 
-This prevents hindsight bias in parameter selection.
+Optimizes for risk-adjusted returns (NOT ISP coherence).
+Includes 0.1% transaction costs.
+Train on 2018-2024, holdout 2025-2026.
 """
 
 import os
@@ -25,10 +30,13 @@ from ensemble_engine import compute_ensemble_signal
 import importlib.util
 
 print("=" * 70)
-print("MTTD GRID SEARCH V2 — HOLDOUT VERSION")
+print("MTTD GRID SEARCH V3 — REDUCED INDICATOR SET")
 print("=" * 70)
-print("Training period: 2018-01-01 to 2024-12-31")
-print("Holdout period:  2025-01-01 to present (NOT used in optimization)")
+print("Indicators: 4 (Adaptive Cloud, Kalman RSI, ALMA Lag, RMSD Trend)")
+print("Optimization: Risk-adjusted returns (NOT ISP coherence)")
+print("Transaction costs: 0.1% round-trip")
+print("Training: 2018-01-01 to 2024-12-31")
+print("Holdout: 2025-01-01 to present")
 print("=" * 70)
 
 # ================================================================
@@ -78,19 +86,12 @@ print(f"\n  ISP Training: {isp_transitions_train} transitions, {(isp_positions_t
 print(f"  ISP Holdout:  {isp_transitions_holdout} transitions, {(isp_positions_holdout == 1.0).mean()*100:.1f}% in position")
 
 # ================================================================
-# Compute ISP Benchmark Metrics (Training Period)
+# Compute ISP Benchmark Metrics (Training Period) — Reference Only
 # ================================================================
-print("\n[2/6] Computing ISP benchmark metrics (training period)...")
+print("\n[2/6] Computing ISP benchmark metrics (reference only, NOT used in optimization)...")
 
 def compute_trading_metrics(positions, prices, initial_capital=100000.0, transaction_cost=0.001):
-    """Compute trading performance metrics.
-    
-    Args:
-        positions: Series of position sizes (0 or 1)
-        prices: Series of prices
-        initial_capital: Starting capital
-        transaction_cost: Round-trip cost per trade as decimal (default 0.001 = 0.1%)
-    """
+    """Compute trading performance metrics with transaction costs."""
     returns = prices.pct_change()
     strategy_returns = returns * positions.shift(1)
     strategy_returns = strategy_returns.dropna()
@@ -145,7 +146,7 @@ def compute_trading_metrics(positions, prices, initial_capital=100000.0, transac
     }
 
 def compute_isp_coherence(positions, benchmark):
-    """Compute time-coherence with ISP benchmark."""
+    """Compute time-coherence with ISP benchmark (for reference only)."""
     aligned = pd.DataFrame({'system': positions, 'benchmark': benchmark}).dropna()
     if len(aligned) == 0:
         return 0.0
@@ -153,7 +154,7 @@ def compute_isp_coherence(positions, benchmark):
     return matches / len(aligned) * 100
 
 isp_metrics_train = compute_trading_metrics(isp_positions_train, df_train['close'])
-print(f"  ISP Training Metrics:")
+print(f"  ISP Training (reference):")
 print(f"    CAGR:   {isp_metrics_train['cagr']:.2f}%")
 print(f"    Sharpe: {isp_metrics_train['sharpe']:.2f}")
 print(f"    Sortino:{isp_metrics_train['sortino']:.2f}")
@@ -162,72 +163,51 @@ print(f"    MaxDD:  {isp_metrics_train['max_dd']:.2f}%")
 print(f"    Trades: {isp_metrics_train['n_trades']}")
 
 # ================================================================
-# Indicator Definitions with Tunable Parameters
+# REDUCED Indicator Definitions (4 indicators only)
 # ================================================================
-print("\n[3/6] Defining indicator search space...")
+print("\n[3/6] Defining indicator search space (4 indicators only)...")
 
 INDICATORS = [
+    {
+        'name': 'adaptive_regime_cloud',
+        'category': 'perpetual',
+        'func_name': 'adaptive_regime_cloud',
+        'params': {'hurst_period': [30, 40, 50, 60, 70]},
+        'rationale': 'Regime detection — THE core indicator'
+    },
     {
         'name': 'kalman_filtered_rsi_oscillator',
         'category': 'oscillator',
         'func_name': 'kalman_filtered_rsi_oscillator',
-        'params': {'rsi_period': [10, 12, 14, 16, 18, 20]}
-    },
-    {
-        'name': 'z_smma_quantedgeb',
-        'category': 'oscillator',
-        'func_name': 'z_smma_quantedgeb',
-        'params': {'rma_length': [8, 10, 12, 14, 16], 'ema_length': [20, 25, 30, 35, 40], 'z_thresh': [0.05, 0.1, 0.15, 0.2]}
-    },
-    {
-        'name': 'median_rsi_sd_quantedgeb',
-        'category': 'oscillator',
-        'func_name': 'median_rsi_sd_quantedgeb',
-        'params': {'median_length': [5, 7, 10, 12, 15], 'rsi_length': [15, 18, 21, 24, 28]}
-    },
-    {
-        'name': 'polynomial_deviation_bands',
-        'category': 'perpetual',
-        'func_name': 'polynomial_deviation_bands',
-        'params': {'window': [10, 12, 14, 16, 20], 'dev_mult': [1.0, 1.2, 1.5, 1.8, 2.0]}
-    },
-    {
-        'name': 'gaussian_smooth_trend_quantedgeb',
-        'category': 'perpetual',
-        'func_name': 'gaussian_smooth_trend_quantedgeb',
-        'params': {'dema_length': [5, 6, 7, 8, 10], 'gaussian_sigma': [1.5, 2.0, 2.5, 3.0]}
+        'params': {'rsi_period': [10, 12, 14, 16, 18, 20]},
+        'rationale': 'Momentum factor — different from trend'
     },
     {
         'name': 'alma_lag_viresearch',
         'category': 'perpetual',
         'func_name': 'alma_lag_viresearch',
-        'params': {'alma_length': [60, 70, 78, 85, 100], 'alma_offset': [0.80, 0.85, 0.90]}
-    },
-    {
-        'name': 'adaptive_regime_cloud',
-        'category': 'perpetual',
-        'func_name': 'adaptive_regime_cloud',
-        'params': {'hurst_period': [30, 40, 50, 60, 70]}
+        'params': {'alma_length': [60, 70, 78, 85, 100], 'alma_offset': [0.80, 0.85, 0.90]},
+        'rationale': 'Trend direction — clean implementation'
     },
     {
         'name': 'root_mean_square_deviation_trend',
         'category': 'perpetual',
         'func_name': 'root_mean_square_deviation_trend',
-        'params': {'length': [20, 24, 28, 32, 36, 40], 'ma_type': ['EMA', 'SMA', 'HMA', 'DEMA']}
-    },
-    {
-        'name': 'p_motion_trend_quantedgeb',
-        'category': 'perpetual',
-        'func_name': 'p_motion_trend_quantedgeb',
-        'params': {'dema_length': [5, 6, 7, 8, 10], 'ema_length': [15, 18, 21, 25, 30]}
-    },
-    {
-        'name': 'dema_adjusted_average_true_range',
-        'category': 'perpetual',
-        'func_name': 'dema_adjusted_average_true_range',
-        'params': {'period_dema': [5, 6, 7, 8, 10], 'factor_atr': [1.2, 1.5, 1.7, 2.0, 2.2]}
+        'params': {'length': [20, 24, 28, 32, 36, 40], 'ma_type': ['EMA', 'SMA', 'HMA', 'DEMA']},
+        'rationale': 'Trend quality + volatility adjustment'
     }
 ]
+
+# Calculate total combinations
+total_combos = 1
+for ind in INDICATORS:
+    combos = 1
+    for v in ind['params'].values():
+        combos *= len(v)
+    total_combos *= combos
+    print(f"  {ind['name']}: {combos} combinations — {ind['rationale']}")
+
+print(f"\n  Total combinations: {total_combos}")
 
 def detect_direction(res_df):
     """Extract direction from indicator output."""
@@ -271,7 +251,6 @@ def compute_indicator_with_params(indicator_def, params, df):
     """Compute indicator with given parameters and return binary signal."""
     try:
         func = load_indicator_func(indicator_def['name'], indicator_def['category'])
-        # Filter params to only those accepted by the function
         import inspect
         sig = inspect.signature(func)
         valid_params = {k: v for k, v in params.items() if k in sig.parameters}
@@ -285,11 +264,14 @@ def compute_indicator_with_params(indicator_def, params, df):
 
 # ================================================================
 # Phase A: Optimize Individual Indicator Parameters (TRAINING ONLY)
+# Optimization: Risk-adjusted returns (NOT ISP coherence)
 # ================================================================
 print("\n[4/6] Phase A: Optimizing individual indicator parameters (TRAINING DATA ONLY)...")
+print("  Optimization target: Risk-adjusted returns (Sharpe × 0.5 + Calmar × 0.3 + Sortino × 0.2)")
+print("  ISP coherence: NOT used in optimization (reference only)")
 
 best_indicator_params = {}
-indicator_isp_coherence = {}
+indicator_scores = {}
 
 for ind_def in INDICATORS:
     ind_name = ind_def['name']
@@ -301,7 +283,7 @@ for ind_def in INDICATORS:
 
     best_score = -999
     best_params = None
-    best_coherence = 0
+    best_metrics = None
 
     for combo in combinations:
         params = dict(zip(param_names, combo))
@@ -310,33 +292,28 @@ for ind_def in INDICATORS:
         if signal is None:
             continue
 
-        # Compute ISP coherence (TRAINING ONLY)
-        coherence = compute_isp_coherence(signal, isp_positions_train)
-
-        # Compute trading metrics (TRAINING ONLY)
+        # Compute trading metrics (TRAINING ONLY, with transaction costs)
         position = (signal > 0).astype(float)
         metrics = compute_trading_metrics(position, df_train['close'])
 
-        # Score — ISP coherence NOT used (reference only, excluded from optimization)
-        sharpe_ratio = metrics['sharpe'] / isp_metrics_train['sharpe'] if isp_metrics_train['sharpe'] > 0 else 0
-        sortino_ratio = metrics['sortino'] / isp_metrics_train['sortino'] if isp_metrics_train['sortino'] > 0 else 0
-        calmar_ratio = metrics['calmar'] / isp_metrics_train['calmar'] if isp_metrics_train['calmar'] > 0 else 0
-
-        score = sharpe_ratio * 0.5 + calmar_ratio * 0.3 + sortino_ratio * 0.2
+        # Score — Risk-adjusted returns ONLY (ISP coherence NOT used)
+        score = metrics['sharpe'] * 0.5 + metrics['calmar'] * 0.3 + metrics['sortino'] * 0.2
 
         if score > best_score:
             best_score = score
             best_params = params
-            best_coherence = coherence
+            best_metrics = metrics
 
     if best_params is not None:
         best_indicator_params[ind_name] = best_params
-        indicator_isp_coherence[ind_name] = best_coherence
-        print(f"    Best: {best_params} → coherence={best_coherence:.1f}%")
+        indicator_scores[ind_name] = best_metrics
+        print(f"    Best: {best_params}")
+        print(f"    → Sharpe={best_metrics['sharpe']:.2f}, Calmar={best_metrics['calmar']:.2f}, "
+              f"Sortino={best_metrics['sortino']:.2f}, CAGR={best_metrics['cagr']:.1f}%, "
+              f"MaxDD={best_metrics['max_dd']:.1f}%")
     else:
         print(f"    No valid combination found, using defaults")
         best_indicator_params[ind_name] = {}
-        indicator_isp_coherence[ind_name] = 0
 
 # ================================================================
 # Phase B: Optimize Ensemble Min Hold (TRAINING ONLY)
@@ -362,6 +339,13 @@ signal_matrix_train = pd.DataFrame(signal_matrix_train)
 n_indicators = len(signal_matrix_train.columns)
 print(f"\n  Active indicators: {n_indicators}")
 
+# Compute expected correlations
+print("\n  Computing actual indicator correlations...")
+if n_indicators > 1:
+    corr_matrix = signal_matrix_train.corr()
+    print(f"\n  Correlation matrix:")
+    print(f"  {corr_matrix.to_string()}")
+
 # Grid search min_hold on TRAINING data
 print("\n  Grid searching min_hold on training data...")
 min_hold_range = [1, 3, 5, 7, 10, 15, 20, 25, 30]
@@ -374,12 +358,8 @@ for min_hold in min_hold_range:
     metrics = compute_trading_metrics(position, df_train['close'])
     coherence = compute_isp_coherence(position, isp_positions_train)  # reference only
 
-    # Score — ISP coherence NOT used (reference only, excluded from optimization)
-    sharpe_ratio = metrics['sharpe'] / isp_metrics_train['sharpe'] if isp_metrics_train['sharpe'] > 0 else 0
-    sortino_ratio = metrics['sortino'] / isp_metrics_train['sortino'] if isp_metrics_train['sortino'] > 0 else 0
-    calmar_ratio = metrics['calmar'] / isp_metrics_train['calmar'] if isp_metrics_train['calmar'] > 0 else 0
-
-    score = sharpe_ratio * 0.5 + calmar_ratio * 0.3 + sortino_ratio * 0.2
+    # Score — Risk-adjusted returns ONLY
+    score = metrics['sharpe'] * 0.5 + metrics['calmar'] * 0.3 + metrics['sortino'] * 0.2
 
     train_results.append({
         'min_hold': min_hold,
@@ -388,9 +368,10 @@ for min_hold in min_hold_range:
         **metrics
     })
 
-    print(f"    min_hold={min_hold:2d}: coherence={coherence:.1f}%, sharpe={metrics['sharpe']:.2f}, "
+    print(f"    min_hold={min_hold:2d}: sharpe={metrics['sharpe']:.2f}, "
           f"sortino={metrics['sortino']:.2f}, calmar={metrics['calmar']:.2f}, "
-          f"max_dd={metrics['max_dd']:.1f}%, cagr={metrics['cagr']:.1f}%")
+          f"max_dd={metrics['max_dd']:.1f}%, cagr={metrics['cagr']:.1f}%, "
+          f"coherence={coherence:.1f}%")
 
 # Sort by score
 train_results.sort(key=lambda x: x['score'], reverse=True)
@@ -401,30 +382,14 @@ print("GRID SEARCH RESULTS (TRAINING PERIOD)")
 print("=" * 70)
 
 print(f"\nBest min_hold: {best_train['min_hold']}")
-print(f"  Coherence: {best_train['coherence']:.1f}%")
-print(f"  CAGR:      {best_train['cagr']:.2f}% (ISP: {isp_metrics_train['cagr']:.2f}%)")
-print(f"  Sharpe:    {best_train['sharpe']:.2f} (ISP: {isp_metrics_train['sharpe']:.2f})")
-print(f"  Sortino:   {best_train['sortino']:.2f} (ISP: {isp_metrics_train['sortino']:.2f})")
-print(f"  Calmar:    {best_train['calmar']:.2f} (ISP: {isp_metrics_train['calmar']:.2f})")
-print(f"  Max DD:    {best_train['max_dd']:.2f}% (ISP: {isp_metrics_train['max_dd']:.2f}%)")
-print(f"  Trades:    {best_train['n_trades']} (ISP: {isp_metrics_train['n_trades']})")
-
-# Check if trading metrics match/exceed ISP
-checks_train = {
-    'Sharpe': best_train['sharpe'] >= isp_metrics_train['sharpe'],
-    'Sortino': best_train['sortino'] >= isp_metrics_train['sortino'],
-    'Calmar': best_train['calmar'] >= isp_metrics_train['calmar'],
-    'MaxDD': abs(best_train['max_dd']) <= abs(isp_metrics_train['max_dd']),
-    'CAGR': best_train['cagr'] >= isp_metrics_train['cagr'],
-}
-
-print(f"\nISP Benchmark Reference (Training) — informational only:")
-for metric, passed in checks_train.items():
-    status = "✓ ABOVE" if passed else "  below"
-    print(f"  {metric:10s}: {status}")
-
-n_passed = sum(checks_train.values())
-print(f"\n{n_passed}/{len(checks_train)} metrics above ISP baseline (reference, not used in optimization)")
+print(f"  CAGR:      {best_train['cagr']:.2f}%")
+print(f"  Sharpe:    {best_train['sharpe']:.2f}")
+print(f"  Sortino:   {best_train['sortino']:.2f}")
+print(f"  Calmar:    {best_train['calmar']:.2f}")
+print(f"  Max DD:    {best_train['max_dd']:.2f}%")
+print(f"  Trades:    {best_train['n_trades']}")
+print(f"  In-market: {best_train['pct_in']:.1f}%")
+print(f"  Coherence: {best_train['coherence']:.1f}% (reference only)")
 
 # ================================================================
 # HOLDOUT EVALUATION
@@ -460,7 +425,6 @@ metrics_full = compute_trading_metrics(position_full, df_full['close'])
 
 # ISP metrics for full period
 isp_metrics_full = compute_trading_metrics(isp_positions_full, df_full['close'])
-isp_metrics_holdout = compute_trading_metrics(isp_positions_holdout, df_holdout['close'])
 
 # Coherence for each period
 coherence_train = compute_isp_coherence(position_train, isp_positions_train)
@@ -480,6 +444,7 @@ print(f"{'Sortino':<12} {metrics_train['sortino']:<15.2f} {metrics_holdout['sort
 print(f"{'Calmar':<12} {metrics_train['calmar']:<15.2f} {metrics_holdout['calmar']:<15.2f} {metrics_full['calmar']:<15.2f} {isp_metrics_full['calmar']:<15.2f}")
 print(f"{'MaxDD':<12} {metrics_train['max_dd']:<15.2f} {metrics_holdout['max_dd']:<15.2f} {metrics_full['max_dd']:<15.2f} {isp_metrics_full['max_dd']:<15.2f}")
 print(f"{'Trades':<12} {metrics_train['n_trades']:<15} {metrics_holdout['n_trades']:<15} {metrics_full['n_trades']:<15} {isp_metrics_full['n_trades']:<15}")
+print(f"{'In-market':<12} {metrics_train['pct_in']:<15.1f} {metrics_holdout['pct_in']:<15.1f} {metrics_full['pct_in']:<15.1f} {isp_metrics_full['pct_in']:<15.1f}")
 print(f"{'Coherence':<12} {coherence_train:<15.1f} {coherence_holdout:<15.1f} {coherence_full:<15.1f} {'N/A':<15}")
 
 # Degradation analysis
@@ -540,17 +505,19 @@ for w in warnings_list:
 
 # Save results
 output = {
+    'version': 'v3_reduced_4_indicators',
+    'optimization_target': 'risk_adjusted_returns',
+    'transaction_cost': 0.001,
     'holdout_start': HOLDOUT_START,
     'training_period': f"{df_train.index[0]} to {df_train.index[-1]}",
     'holdout_period': f"{df_holdout.index[0]} to {df_holdout.index[-1]}",
+    'indicators_used': [ind['name'] for ind in INDICATORS],
     'best_indicator_params': best_indicator_params,
-    'indicator_isp_coherence': indicator_isp_coherence,
     'best_min_hold': best_train['min_hold'],
     'training_metrics': metrics_train,
     'holdout_metrics': metrics_holdout,
     'full_metrics': metrics_full,
     'isp_full_metrics': isp_metrics_full,
-    'isp_holdout_metrics': isp_metrics_holdout,
     'coherence': {
         'training': coherence_train,
         'holdout': coherence_holdout,
@@ -563,11 +530,11 @@ output = {
     'train_results': train_results
 }
 
-output_path = os.path.join(project_root, 'grid_search_v2_holdout_results.json')
+output_path = os.path.join(project_root, 'grid_search_v3_results.json')
 with open(output_path, 'w') as f:
     json.dump(output, f, indent=2, default=str)
 
 print(f"\nResults saved to: {output_path}")
 print("\n" + "=" * 70)
-print("GRID SEARCH COMPLETE")
+print("GRID SEARCH V3 COMPLETE")
 print("=" * 70)
