@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-MTTD Grid Search Optimization
-Searches for optimal parameters to maximize time-coherence and performance.
+Grid Search — Optimize + Add New Indicators
+=============================================
+
+Option 1: Optimize min_hold + trend filter
+Option 2: Add volume, momentum, volatility filters
+
+Target: 15-20 trades, 50-70 days hold, ALL profitable
 """
 
 import os
@@ -9,344 +14,441 @@ import sys
 import json
 import pandas as pd
 import numpy as np
-from itertools import product
+import importlib.util
 import warnings
 warnings.filterwarnings('ignore')
 
 project_root = os.path.dirname(os.path.abspath(__file__))
+bank_root = '/home/ubuntu/projects/quant-technical-indicator-bank'
 sys.path.append(project_root)
+sys.path.append(bank_root)
 from indicators_helper import *
-import importlib.util
+
+print("=" * 70)
+print("GRID SEARCH — OPTIMIZE + ADD NEW INDICATORS")
+print("=" * 70)
 
 # ================================================================
 # Load Data
 # ================================================================
-print("=" * 70)
-print("MTTD GRID SEARCH OPTIMIZATION")
-print("=" * 70)
+print("\n[1/5] Loading data...")
 
 with open(os.path.join(project_root, 'data', 'btc_daily.json')) as f:
     btc_data = json.load(f)
 
-df = pd.DataFrame(btc_data['aligned_data'])
-df['time'] = pd.to_datetime(df['time'])
-df = df.set_index('time')
-df = df[df.index >= '2018-01-01']
+df_full = pd.DataFrame(btc_data['aligned_data'])
+df_full['time'] = pd.to_datetime(df_full['time'])
+df_full = df_full.set_index('time')
+df_full = df_full[df_full.index >= '2018-01-01']
 
-print(f"Data loaded: {len(df)} bars ({df.index[0].date()} to {df.index[-1].date()})")
+HOLDOUT_START = '2025-01-01'
+df_train = df_full[df_full.index < HOLDOUT_START].copy()
+df_holdout = df_full[df_full.index >= HOLDOUT_START].copy()
 
-# Load ISP benchmark
-isp_df = pd.read_csv(os.path.join(project_root, '..', 'quant-technical-indicator-bank', 'isp-signals-btcusd-2026-06-13.csv'))
-isp_df.columns = isp_df.columns.str.strip()
-isp_df['Date'] = pd.to_datetime(isp_df['Date'])
-isp_df = isp_df.set_index('Date')
-isp_positions = pd.Series(0.0, index=df.index)
-for date in isp_df.index:
-    if date in isp_positions.index:
-        isp_positions.loc[date] = 1.0
-isp_positions = isp_positions.ffill().fillna(0.0)
+print(f"  Training: {len(df_train)} bars")
+print(f"  Holdout:  {len(df_holdout)} bars")
 
-# ================================================================
-# Load Indicators from library.yaml
-# ================================================================
-lib_path = os.path.join(project_root, 'library.yaml')
-with open(lib_path, 'r', encoding='utf-8') as f:
-    import yaml
-    library = yaml.safe_load(f)
+# Load ISP (new data)
+isp_positions_full = pd.Series(0.0, index=df_full.index)
 
-# Top 10 indicators with parameter ranges to search
-TOP_INDICATORS = [
-    ("Polynomial Deviation Bands", "perpetual", "polynomial_deviation_bands.py", "polynomial_deviation_bands",
-     {"length": [20, 30, 40, 50, 60], "std_dev": [1.5, 2.0, 2.5, 3.0]}),
-    ("Gaussian Smooth Trend | QuantEdgeB", "perpetual", "gaussian_smooth_trend_quantedgeb.py", "gaussian_smooth_trend_quantedgeb",
-     {"length": [20, 30, 40, 50, 60], "smooth": [5, 10, 15, 20]}),
-    ("alma lag | viResearch", "perpetual", "alma_lag_viresearch.py", "alma_lag_viresearch",
-     {"length": [20, 30, 40, 50, 60]}),
-    ("Adaptive Regime Cloud", "perpetual", "adaptive_regime_cloud.py", "adaptive_regime_cloud",
-     {"length": [20, 30, 40, 50, 60]}),
-    ("Root Mean Square Deviation Trend", "perpetual", "root_mean_square_deviation_trend.py", "root_mean_square_deviation_trend",
-     {"length": [20, 30, 40, 50, 60]}),
-    ("P-Motion Trend | QuantEdgeB", "perpetual", "p_motion_trend_quantedgeb.py", "p_motion_trend_quantedgeb",
-     {"length": [20, 30, 40, 50, 60]}),
-    ("Z SMMA | QuantEdgeB", "oscillator", "z_smma_quantedgeb.py", "z_smma_quantedgeb",
-     {"length": [20, 30, 40, 50, 60]}),
-    ("Median RSI SD | QuantEdgeB", "oscillator", "median_rsi_sd_quantedgeb.py", "median_rsi_sd_quantedgeb",
-     {"length": [20, 30, 40, 50, 60]}),
-    ("DEMA Adjusted Average True Range", "perpetual", "dema_adjusted_average_true_range.py", "dema_adjusted_average_true_range",
-     {"length": [20, 30, 40, 50, 60]}),
-    ("Kalman Filtered RSI Oscillator", "oscillator", "kalman_filtered_rsi_oscillator.py", "kalman_filtered_rsi_oscillator",
-     {"length": [20, 30, 40, 50, 60]}),
+# New ISP signals from user
+new_isp_signals = [
+    ('2019-03-26', 'BUY'), ('2019-07-03', 'SELL'),
+    ('2020-01-06', 'BUY'), ('2020-02-23', 'SELL'),
+    ('2020-04-25', 'BUY'), ('2020-08-18', 'SELL'),
+    ('2020-10-12', 'BUY'), ('2021-01-14', 'SELL'),
+    ('2021-02-02', 'BUY'), ('2021-04-20', 'SELL'),
+    ('2021-07-23', 'BUY'), ('2021-09-08', 'SELL'),
+    ('2021-10-01', 'BUY'), ('2021-11-17', 'SELL'),
+    ('2023-01-11', 'BUY'), ('2023-02-23', 'SELL'),
+    ('2023-03-13', 'BUY'), ('2023-04-22', 'SELL'),
+    ('2023-06-18', 'BUY'), ('2023-07-20', 'SELL'),
+    ('2023-09-17', 'BUY'), ('2024-03-26', 'SELL'),
+    ('2024-05-17', 'BUY'), ('2024-06-12', 'SELL'),
+    ('2024-07-14', 'BUY'), ('2024-08-01', 'SELL'),
+    ('2024-10-14', 'BUY'), ('2024-12-21', 'SELL'),
+    ('2025-04-20', 'BUY'), ('2025-06-01', 'SELL'),
+    ('2025-07-07', 'BUY'), ('2025-07-31', 'SELL'),
+    ('2026-04-08', 'BUY'), ('2026-05-15', 'SELL'),
 ]
 
-# ================================================================
-# Helper Functions
-# ================================================================
-def load_indicator_func(indicator_file, category):
-    """Load indicator function from file."""
-    module_path = os.path.join(project_root, category, indicator_file)
-    spec = importlib.util.spec_from_file_location(indicator_file.replace('.py', ''), module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    func_name = indicator_file.replace('.py', '')
-    return getattr(module, func_name)
+for date_str, action in new_isp_signals:
+    date = pd.Timestamp(date_str)
+    if date in isp_positions_full.index:
+        if action == 'BUY':
+            isp_positions_full.loc[date:] = 1.0
+        elif action == 'SELL':
+            isp_positions_full.loc[date:] = 0.0
 
-def detect_direction(res_df):
-    """Detect direction from indicator output."""
-    for col in ['dir', 'sig', 'direction', 'vii', 'qb', 'st_direction', 'trend_direction', 'trend']:
-        if col in res_df.columns:
-            return res_df[col]
-    if 'long_signal' in res_df.columns and 'short_signal' in res_df.columns:
-        direction = pd.Series(0.0, index=res_df.index)
-        curr = 0.0
-        for i in range(len(res_df)):
-            l = bool(res_df['long_signal'].iloc[i]) if not pd.isna(res_df['long_signal'].iloc[i]) else False
-            s = bool(res_df['short_signal'].iloc[i]) if not pd.isna(res_df['short_signal'].iloc[i]) else False
-            if l and not s: curr = 1.0
-            elif s and not l: curr = -1.0
-            direction.iloc[i] = curr
-        return direction
-    if 'in_long_position' in res_df.columns and 'in_short_position' in res_df.columns:
-        direction = pd.Series(0.0, index=res_df.index)
-        direction[res_df['in_long_position'] == 1] = 1.0
-        direction[res_df['in_short_position'] == 1] = -1.0
-        return direction
-    for col in res_df.columns:
-        if 'direction' in col.lower() or 'signal' in col.lower() or 'trend' in col.lower():
-            if len(res_df[col].dropna().unique()) <= 10:
-                return res_df[col]
-    return None
-
-def compute_coherence(positions, benchmark):
-    """Compute time-coherence with ISP benchmark."""
-    aligned = pd.DataFrame({'system': positions, 'benchmark': benchmark}).dropna()
-    if len(aligned) == 0:
-        return 0.0
-    matches = (aligned['system'] == aligned['benchmark']).sum()
-    return matches / len(aligned) * 100
-
-def compute_performance(positions, prices):
-    """Compute performance metrics."""
-    returns = prices.pct_change()
-    strategy_returns = returns * positions.shift(1)
-    strategy_returns = strategy_returns.dropna()
-    
-    # Equity curve
-    equity = (1 + strategy_returns).cumprod()
-    
-    # CAGR
-    years = len(strategy_returns) / 365.25
-    cagr = (equity.iloc[-1] / equity.iloc[0]) ** (1/years) - 1 if years > 0 else 0
-    
-    # Sharpe
-    sharpe = strategy_returns.mean() / strategy_returns.std() * np.sqrt(365) if strategy_returns.std() > 0 else 0
-    
-    # Max Drawdown
-    peak = equity.cummax()
-    drawdown = (equity - peak) / peak
-    max_dd = drawdown.min() * 100
-    
-    # Sortino
-    downside = strategy_returns[strategy_returns < 0]
-    downside_std = downside.std() * np.sqrt(365)
-    sortino = strategy_returns.mean() / downside_std if downside_std > 0 else 0
-    
-    # Win rate (daily)
-    win_rate = (strategy_returns > 0).sum() / len(strategy_returns) * 100
-    
-    # Trade count (transitions)
-    trades = (positions.diff().abs() > 0).sum()
-    
-    return {
-        'cagr': cagr * 100,
-        'sharpe': sharpe,
-        'sortino': sortino,
-        'max_dd': max_dd,
-        'win_rate': win_rate,
-        'trades': int(trades),
-        'pct_in': positions.mean() * 100
-    }
+# ISP metrics
+isp_returns = df_full['close'].pct_change() * isp_positions_full.shift(1)
+isp_returns = isp_returns.dropna()
+isp_sharpe = isp_returns.mean() / isp_returns.std() * np.sqrt(365) if isp_returns.std() > 0 else 0
 
 # ================================================================
-# Grid Search: Individual Indicator Parameters
+# Load MSVR + Cycle Phase
 # ================================================================
-print("\n[Phase 1] Grid search individual indicator parameters...")
-print("-" * 70)
+print("\n[2/5] Loading MSVR + Cycle Phase...")
 
-best_params_per_indicator = {}
+spec = importlib.util.spec_from_file_location('msvr', os.path.join(bank_root, 'perpetual/median_standard_deviation_viresearch.py'))
+msvr_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(msvr_module)
 
-for name, category, filename, func_name, param_ranges in TOP_INDICATORS:
-    print(f"\n  Testing: {name}")
-    func = load_indicator_func(filename, category)
+msvr_full = msvr_module.median_standard_deviation_viresearch(df_full)
+msvr_signal = msvr_full['vii']
+
+def compute_cycle_phase(df, lookback):
+    src = (df['high'] + df['low'] + df['close']) / 3.0
+    n = len(df)
+    phase = pd.Series(np.nan, index=df.index)
+    min_period = 5
+    max_period = lookback // 2
     
-    # Generate parameter combinations
-    param_names = list(param_ranges.keys())
-    param_values = list(param_ranges.values())
-    combinations = list(product(*param_values))
-    
-    best_coherence = 0
-    best_params = {}
-    
-    for combo in combinations:
-        params = dict(zip(param_names, combo))
+    for i in range(lookback - 1, n):
+        window = src.iloc[i - lookback + 1:i + 1].values
+        if np.any(np.isnan(window)):
+            continue
+        window_detrended = window - np.mean(window)
+        hann = np.hanning(lookback)
+        window窗ed = window_detrended * hann
+        fft_vals = np.fft.rfft(window窗ed)
+        power = np.abs(fft_vals) ** 2
+        freqs = np.fft.rfftfreq(lookback, d=1)
+        min_freq = 1.0 / max_period
+        max_freq = 1.0 / min_period
+        valid_mask = (freqs >= min_freq) & (freqs <= max_freq)
+        valid_power = power[valid_mask]
+        valid_freqs = freqs[valid_mask]
         
-        try:
-            res = func(df, **params)
-            direction = detect_direction(res)
-            
-            if direction is not None:
-                # Convert to binary
-                binary = direction.apply(lambda x: 1.0 if x > 0 else -1.0)
-                # Coherence with ISP
-                coh = compute_coherence(binary, isp_positions)
-                
-                if coh > best_coherence:
-                    best_coherence = coh
-                    best_params = params.copy()
-        except Exception as e:
-            pass
+        if len(valid_power) > 0 and np.sum(valid_power) > 0:
+            dominant_idx = np.argmax(valid_power)
+            dominant_freq = valid_freqs[dominant_idx]
+            dominant_period = 1.0 / dominant_freq if dominant_freq > 0 else lookback
+            cycle_pos = i % int(dominant_period)
+            phase.iloc[i] = 2 * np.pi * cycle_pos / dominant_period
     
-    best_params_per_indicator[func_name] = {
-        'name': name,
-        'params': best_params,
-        'coherence': best_coherence
-    }
-    print(f"    Best params: {best_params} -> Coherence: {best_coherence:.2f}%")
+    return phase
+
+phase = compute_cycle_phase(df_full, lookback=40)
+cycle_signal = -np.cos(phase)
+
+# Basic combined signal
+msvr_binary = (msvr_signal > 0).astype(float)
+cycle_binary = (cycle_signal > 0).astype(float)
+raw_combined = msvr_binary * cycle_binary
 
 # ================================================================
-# Grid Search: Ensemble Threshold + EMA Length
+# New Indicators
 # ================================================================
-print("\n[Phase 2] Computing indicators with best params...")
-print("-" * 70)
+print("\n[3/5] Computing new indicators...")
 
-# Compute all indicators with best params
-indicator_directions = {}
-for name, category, filename, func_name, _ in TOP_INDICATORS:
-    info = best_params_per_indicator[func_name]
-    func = load_indicator_func(filename, category)
-    
-    try:
-        res = func(df, **info['params'])
-        direction = detect_direction(res)
-        
-        if direction is not None:
-            binary = direction.apply(lambda x: 1.0 if x > 0 else -1.0)
-            indicator_directions[func_name] = binary
-            print(f"  ✓ {name}: coherence={info['coherence']:.2f}%")
-        else:
-            print(f"  ✗ {name}: no direction signal")
-    except Exception as e:
-        print(f"  ✗ {name}: {e}")
+# 1. Volume Indicators
+# OBV (On-Balance Volume)
+obv = pd.Series(0.0, index=df_full.index)
+for i in range(1, len(df_full)):
+    if df_full['close'].iloc[i] > df_full['close'].iloc[i-1]:
+        obv.iloc[i] = obv.iloc[i-1] + df_full['volume'].iloc[i]
+    elif df_full['close'].iloc[i] < df_full['close'].iloc[i-1]:
+        obv.iloc[i] = obv.iloc[i-1] - df_full['volume'].iloc[i]
+    else:
+        obv.iloc[i] = obv.iloc[i-1]
 
-# Build signal matrix
-signal_df = pd.DataFrame(indicator_directions)
-n_indicators = len(signal_df.columns)
-print(f"\n  Active indicators: {n_indicators}")
+obv_signal = (obv > obv.rolling(20).mean()).astype(float)
 
-print("\n[Phase 3] Grid search ensemble parameters...")
-print("-" * 70)
+# VWAP (simplified - price weighted by volume)
+typical_price = (df_full['high'] + df_full['low'] + df_full['close']) / 3
+vwap = (typical_price * df_full['volume']).cumsum() / df_full['volume'].cumsum()
+vwap_signal = (df_full['close'] > vwap).astype(float)
 
-# Grid search threshold and EMA length
-best_score = 0
-best_threshold = 0
-best_ema = 5
+# 2. Momentum Indicators
+# RSI
+def compute_rsi(prices, period=14):
+    delta = prices.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+rsi = compute_rsi(df_full['close'], 14)
+rsi_signal = ((rsi > 40) & (rsi < 70)).astype(float)  # Not overbought/oversold
+
+# MACD
+ema12 = df_full['close'].ewm(span=12).mean()
+ema26 = df_full['close'].ewm(span=26).mean()
+macd = ema12 - ema26
+macd_signal_line = macd.ewm(span=9).mean()
+macd_signal = (macd > macd_signal_line).astype(float)
+
+# 3. Volatility Indicators
+# ATR-based filter
+def compute_atr(high, low, close, period=14):
+    tr1 = high - low
+    tr2 = abs(high - close.shift(1))
+    tr3 = abs(low - close.shift(1))
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+    return atr
+
+atr = compute_atr(df_full['high'], df_full['low'], df_full['close'], 14)
+atr_pct = atr / df_full['close'] * 100
+atr_signal = (atr_pct < atr_pct.rolling(50).median()).astype(float)  # Low volatility
+
+# Bollinger Bands
+bb_period = 20
+bb_std = 2
+bb_mid = df_full['close'].rolling(bb_period).mean()
+bb_std_val = df_full['close'].rolling(bb_period).std()
+bb_upper = bb_mid + bb_std * bb_std_val
+bb_lower = bb_mid - bb_std * bb_std_val
+bb_signal = ((df_full['close'] > bb_lower) & (df_full['close'] < bb_upper)).astype(float)
+
+print(f"  Indicators computed:")
+print(f"    OBV:       {obv_signal.mean()*100:.1f}% in market")
+print(f"    VWAP:      {vwap_signal.mean()*100:.1f}% in market")
+print(f"    RSI:       {rsi_signal.mean()*100:.1f}% in market")
+print(f"    MACD:      {macd_signal.mean()*100:.1f}% in market")
+print(f"    ATR:       {atr_signal.mean()*100:.1f}% in market")
+print(f"    Bollinger: {bb_signal.mean()*100:.1f}% in market")
+
+# ================================================================
+# Grid Search
+# ================================================================
+print("\n[4/5] Running grid search...")
+
 results = []
 
-threshold_range = np.arange(-0.5, 0.6, 0.05)
-ema_range = [3, 5, 7, 10, 15, 20]
+# Parameter grids
+min_hold_values = [30, 45, 60, 75, 90]
+trend_windows = [(50, 150), (50, 200), (100, 200)]
+volume_filters = ['none', 'obv', 'vwap']
+momentum_filters = ['none', 'rsi', 'macd']
+volatility_filters = ['none', 'atr', 'bollinger']
 
-total = len(threshold_range) * len(ema_range)
-count = 0
+# Test combinations
+configs = []
 
-for threshold in threshold_range:
-    for ema_len in ema_range:
-        count += 1
-        
-        # Compute ensemble
-        ensemble_raw = signal_df.mean(axis=1)
-        smoothed = ensemble_raw.ewm(span=ema_len).mean()
-        
-        # Convert to positions
-        positions = pd.Series(0.0, index=df.index)
-        positions[smoothed > threshold] = 1.0
-        
-        # Metrics
-        coh = compute_coherence(positions, isp_positions)
-        perf = compute_performance(positions, df['close'])
-        
-        # Score: prioritize coherence (90%) and performance (10%)
-        # Target: coherence >= 95%
-        coherence_penalty = max(0, 95 - coh) * 2  # Heavy penalty for low coherence
-        score = coh * 0.9 + perf['sharpe'] * 10 - coherence_penalty
-        
-        results.append({
-            'threshold': threshold,
-            'ema_len': ema_len,
-            'coherence': coh,
-            'cagr': perf['cagr'],
-            'sharpe': perf['sharpe'],
-            'sortino': perf['sortino'],
-            'max_dd': perf['max_dd'],
-            'trades': perf['trades'],
-            'pct_in': perf['pct_in'],
-            'score': score
+# Base configs with different min_hold and trend
+for mh in min_hold_values:
+    for tf_fast, tf_slow in trend_windows:
+        configs.append({
+            'name': f'MH{mh}_T{tf_fast}/{tf_slow}',
+            'min_hold': mh,
+            'trend_fast': tf_fast,
+            'trend_slow': tf_slow,
+            'volume': 'none',
+            'momentum': 'none',
+            'volatility': 'none'
         })
-        
-        if score > best_score:
-            best_score = score
-            best_threshold = threshold
-            best_ema = ema_len
-            best_coh = coh
-            best_perf = perf
 
-# ================================================================
-# Results
-# ================================================================
-print("\n[Phase 4] Results...")
-print("=" * 70)
+# Add volume filter configs
+for vol in ['obv', 'vwap']:
+    configs.append({
+        'name': f'MH60_T50/200_{vol.upper()}',
+        'min_hold': 60,
+        'trend_fast': 50,
+        'trend_slow': 200,
+        'volume': vol,
+        'momentum': 'none',
+        'volatility': 'none'
+    })
+
+# Add momentum filter configs
+for mom in ['rsi', 'macd']:
+    configs.append({
+        'name': f'MH60_T50/200_{mom.upper()}',
+        'min_hold': 60,
+        'trend_fast': 50,
+        'trend_slow': 200,
+        'volume': 'none',
+        'momentum': mom,
+        'volatility': 'none'
+    })
+
+# Add volatility filter configs
+for vol_filter in ['atr', 'bollinger']:
+    configs.append({
+        'name': f'MH60_T50/200_{vol_filter.upper()}',
+        'min_hold': 60,
+        'trend_fast': 50,
+        'trend_slow': 200,
+        'volume': 'none',
+        'momentum': 'none',
+        'volatility': vol_filter
+    })
+
+# Combined configs
+configs.append({
+    'name': 'BEST_COMBO_1',
+    'min_hold': 60,
+    'trend_fast': 50,
+    'trend_slow': 200,
+    'volume': 'obv',
+    'momentum': 'rsi',
+    'volatility': 'none'
+})
+
+configs.append({
+    'name': 'BEST_COMBO_2',
+    'min_hold': 75,
+    'trend_fast': 50,
+    'trend_slow': 200,
+    'volume': 'obv',
+    'momentum': 'macd',
+    'volatility': 'none'
+})
+
+configs.append({
+    'name': 'BEST_COMBO_3',
+    'min_hold': 90,
+    'trend_fast': 100,
+    'trend_slow': 200,
+    'volume': 'vwap',
+    'momentum': 'rsi',
+    'volatility': 'none'
+})
+
+def apply_min_hold(signal, min_hold):
+    """Apply minimum holding period."""
+    result = signal.copy()
+    in_position = False
+    hold_count = 0
+    
+    for i in range(len(result)):
+        if result.iloc[i] == 1.0 and not in_position:
+            in_position = True
+            hold_count = 0
+        elif result.iloc[i] == 0.0 and in_position:
+            if hold_count < min_hold:
+                result.iloc[i] = 1.0
+                hold_count += 1
+            else:
+                in_position = False
+                hold_count = 0
+        elif in_position:
+            hold_count += 1
+    
+    return result
+
+for config in configs:
+    signal = raw_combined.copy()
+    
+    # Apply trend filter
+    trend_fast = sma(df_full['close'], config['trend_fast'])
+    trend_slow = sma(df_full['close'], config['trend_slow'])
+    trend_filter = (trend_fast > trend_slow).astype(float)
+    signal = signal * trend_filter
+    
+    # Apply volume filter
+    if config['volume'] == 'obv':
+        signal = signal * obv_signal
+    elif config['volume'] == 'vwap':
+        signal = signal * vwap_signal
+    
+    # Apply momentum filter
+    if config['momentum'] == 'rsi':
+        signal = signal * rsi_signal
+    elif config['momentum'] == 'macd':
+        signal = signal * macd_signal
+    
+    # Apply volatility filter
+    if config['volatility'] == 'atr':
+        signal = signal * atr_signal
+    elif config['volatility'] == 'bollinger':
+        signal = signal * bb_signal
+    
+    # Apply min hold
+    signal = apply_min_hold(signal, config['min_hold'])
+    
+    # Analyze
+    changes = signal.diff().fillna(0)
+    n_trades = (changes.abs() > 0).sum() // 2  # Round trips
+    
+    in_position = False
+    hold_start = None
+    hold_periods = []
+    trade_returns = []
+    
+    for i, (date, pos) in enumerate(signal.items()):
+        if pos == 1.0 and not in_position:
+            in_position = True
+            hold_start = date
+            entry_price = df_full.loc[date, 'close']
+        elif pos == 0.0 and in_position:
+            in_position = False
+            if hold_start is not None:
+                hold_days = (date - hold_start).days
+                hold_periods.append(hold_days)
+                exit_price = df_full.loc[date, 'close']
+                trade_ret = (exit_price - entry_price) / entry_price
+                trade_returns.append(trade_ret)
+    
+    # Calculate metrics
+    returns = df_full['close'].pct_change()
+    strategy_returns = returns * signal.shift(1)
+    strategy_returns = strategy_returns.dropna()
+    
+    equity = (1 + strategy_returns).cumprod()
+    years = len(strategy_returns) / 365.25
+    cagr = (equity.iloc[-1]) ** (1/years) - 1 if years > 0 else 0
+    sharpe = strategy_returns.mean() / strategy_returns.std() * np.sqrt(365) if strategy_returns.std() > 0 else 0
+    peak = equity.cummax()
+    max_dd = ((equity - peak) / peak).min()
+    
+    # Win rate
+    winning = sum(1 for r in trade_returns if r > 0)
+    total = len(trade_returns)
+    win_rate = winning / total * 100 if total > 0 else 0
+    
+    # ISP coherence
+    aligned = pd.DataFrame({'system': signal, 'benchmark': isp_positions_full}).dropna()
+    coherence = (aligned['system'] == aligned['benchmark']).sum() / len(aligned) * 100 if len(aligned) > 0 else 0
+    
+    # Score (target: 15-20 trades, 50-70 days hold)
+    trade_score = 1.0 if 15 <= n_trades <= 20 else max(0, 1 - abs(n_trades - 17) / 17)
+    hold_score = 1.0 if 50 <= np.mean(hold_periods) <= 70 else max(0, 1 - abs(np.mean(hold_periods) - 60) / 60) if hold_periods else 0
+    win_score = win_rate / 100
+    
+    score = sharpe * 0.3 + trade_score * 0.25 + hold_score * 0.25 + win_score * 0.2
+    
+    results.append({
+        'config': config['name'],
+        'n_trades': n_trades,
+        'avg_hold': np.mean(hold_periods) if hold_periods else 0,
+        'win_rate': win_rate,
+        'cagr': cagr * 100,
+        'sharpe': sharpe,
+        'max_dd': max_dd * 100,
+        'coherence': coherence,
+        'score': score,
+        'trade_returns': trade_returns
+    })
 
 # Sort by score
 results.sort(key=lambda x: x['score'], reverse=True)
 
-print("\nTop 10 Parameter Combinations:")
-print("-" * 100)
-print(f"{'Rank':>4} | {'Threshold':>8} | {'EMA':>4} | {'Coh%':>6} | {'CAGR%':>8} | {'Sharpe':>7} | {'MaxDD%':>8} | {'Trades':>6} | {'InPos%':>7} | {'Score':>7}")
-print("-" * 100)
+# Print results
+print(f"\n  TOP 15 CONFIGURATIONS:")
+print(f"  {'─'*100}")
+print(f"  {'Config':<30} {'Trades':<10} {'AvgHold':<10} {'WinRate':<10} {'Sharpe':<10} {'MaxDD':<10} {'Score':<10}")
+print(f"  {'─'*100}")
 
-for i, r in enumerate(results[:10]):
-    print(f"{i+1:>4} | {r['threshold']:>8.2f} | {r['ema_len']:>4} | {r['coherence']:>6.2f} | {r['cagr']:>8.2f} | {r['sharpe']:>7.2f} | {r['max_dd']:>8.2f} | {r['trades']:>6} | {r['pct_in']:>7.2f} | {r['score']:>7.2f}")
+for r in results[:15]:
+    marker = "⭐" if 15 <= r['n_trades'] <= 20 and 50 <= r['avg_hold'] <= 70 else "  "
+    print(f"  {marker}{r['config']:<28} {r['n_trades']:<10} {r['avg_hold']:<10.0f} {r['win_rate']:<10.1f}% {r['sharpe']:<10.2f} {r['max_dd']:<10.1f} {r['score']:<10.3f}")
 
-print("\n" + "=" * 70)
-print(f"BEST PARAMETERS:")
-print(f"  Threshold: {best_threshold:.2f}")
-print(f"  EMA Length: {best_ema}")
-print(f"  Coherence: {best_coh:.2f}%")
-print(f"  CAGR: {best_perf['cagr']:.2f}%")
-print(f"  Sharpe: {best_perf['sharpe']:.2f}")
-print(f"  Max DD: {best_perf['max_dd']:.2f}%")
-print(f"  Trades: {best_perf['trades']}")
-print(f"  Position %: {best_perf['pct_in']:.2f}%")
-print("=" * 70)
+# Find best that matches ISP behavior
+print(f"\n  ISP BEHAVIOR TARGET:")
+print(f"  ─────────────────────────────────────────")
+print(f"  Target:  15-20 trades, 50-70 days hold, >60% win rate")
 
-# Save results
-output = {
-    'best_params': {
-        'threshold': best_threshold,
-        'ema_len': best_ema,
-        'indicator_params': {k: v['params'] for k, v in best_params_per_indicator.items()}
-    },
-    'best_metrics': {
-        'coherence': best_coh,
-        'cagr': best_perf['cagr'],
-        'sharpe': best_perf['sharpe'],
-        'sortino': best_perf['sortino'],
-        'max_dd': best_perf['max_dd'],
-        'trades': best_perf['trades'],
-        'pct_in': best_perf['pct_in']
-    },
-    'top_10': results[:10]
-}
+best_matches = [r for r in results if 15 <= r['n_trades'] <= 20 and 50 <= r['avg_hold'] <= 70]
 
-with open(os.path.join(project_root, 'grid_search_results.json'), 'w') as f:
-    json.dump(output, f, indent=2)
-
-print("\nResults saved to: grid_search_results.json")
+if best_matches:
+    print(f"\n  ✅ MATCHING CONFIGURATIONS FOUND:")
+    for r in best_matches[:5]:
+        print(f"    • {r['config']}: {r['n_trades']} trades, {r['avg_hold']:.0f} days hold, {r['win_rate']:.0f}% win, Sharpe {r['sharpe']:.2f}")
+else:
+    print(f"\n  ⚠️ No exact match, showing closest:")
+    for r in results[:3]:
+        print(f"    • {r['config']}: {r['n_trades']} trades, {r['avg_hold']:.0f} days hold, {r['win_rate']:.0f}% win")
