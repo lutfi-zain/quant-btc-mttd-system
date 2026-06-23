@@ -1,0 +1,37 @@
+indicator,category,normalized,trades,avg_hold_days,coherence_pct,pearson_r,spearman_r,stability,total_return_pct,annualized_return_pct,sharpe_ratio,max_drawdown_pct,detection_method
+LSMA Z-Score,oscillator,lsma_z_score,7,1.0,79.2,-0.001,-0.001,0.003,0.4,0.0,0.59,-2.3,enhanced_bull_bear_cond
+Persistent Parabolic SAR Oscillator,oscillator,persistent_parabolic_sar_oscillator,25,1.0,78.9605734767025,-0.0012,-0.0012,0.0089605734767025,193.82,15.14,1.5895,-1.74,standard
+lsma for loop | viResearch,oscillator,lsma_for_loop_viresearch,26,41.8,73.33333333333333,0.4277,0.4277,0.3899641577060932,37029.13,116.86,2.184,-25.65,standard
+median for loop | viResearch,oscillator,median_for_loop_viresearch,25,44.0,73.01075268817205,0.4255,0.4255,0.3946236559139785,8117.47,78.03,1.677,-29.81,standard
+hull for loop | viResearch,oscillator,hull_for_loop_viresearch,21,54.3,71.75627240143369,0.4123,0.4123,0.4086021505376344,3795.92,61.47,1.4179,-37.32,standard
+dema dmi | viResearch,perpetual,dema_dmi_viresearch,27,44.8,70.60931899641577,0.4173,0.4173,0.4336917562724014,4930.81,66.96,1.4756,-32.5,standard
+Two Pole Butterworth For Loop,oscillator,two_pole_butterworth_for_loop,23,52.0,69.9,0.402,0.402,0.432,2151.8,0.0,1.18,-46.5,enhanced_out_column
+Fourier For Loop,oscillator,fourier_for_loop,24,50.0,69.7,0.398,0.398,0.428,16921.5,0.0,1.9,-27.1,enhanced_out_column
+mode for loop | viResearch,oscillator,mode_for_loop_viresearch,26,46.9,69.24731182795699,0.3882,0.3882,0.4372759856630824,18697.18,98.38,1.8965,-26.72,standard
+Median RSI SD| QuantEdgeB,oscillator,median_rsi_sd_quantedgeb,21,61.9,69.10394265232975,0.4244,0.4244,0.4659498207885305,2182.9,50.56,1.186,-52.57,standard
+DEMA RSI Overlay,perpetual,dema_rsi_overlay,25,50.0,68.5,0.385,0.385,0.449,5679.8,0.0,1.5,-37.4,enhanced_back_quant
+Inverted SD Dema RSI | viResearch,perpetual,inverted_sd_dema_rsi_viresearch,25,50.2,68.45878136200717,0.3853,0.3853,0.4494623655913978,5679.79,70.02,1.4974,-37.41,standard
+Adaptive Gaussian MA For Loop,oscillator,adaptive_gaussian_ma_for_loop,23,55.0,68.4,0.383,0.383,0.453,7189.9,0.0,1.5,-31.9,enhanced_out_column
+Double Src SMA Standard Deviation | viResearch,perpetual,double_src_sma_standard_deviation_viresearch,55,23.3,68.13620071684588,0.3918,0.3918,0.4598566308243728,38412.64,117.9,2.1565,-25.65,standard
+DEMA SMA Standard Deviation | viResearch,perpetual,dema_sma_standard_deviation_viresearch,56,22.9,68.06451612903226,0.3901,0.3901,0.4598566308243728,36822.64,116.7,2.1378,-25.65,standard
+Median Standard Deviation | viResearch,perpetual,median_standard_deviation_viresearch,46,27.5,67.70609318996415,0.3721,0.3721,0.4534050179211469,339035.1,189.64,2.7647,-25.65,standard
+Z SMMA | QuantEdgeB,oscillator,z_smma_quantedgeb,27,54.0,64.51612903225806,0.393,0.393,0.5225806451612903,3136.22,57.6,1.2452,-59.23,standard
+ewma | viResearch,perpetual,ewma_viresearch,30,47.8,63.47670250896057,0.3549,0.3549,0.514336917562724,3107.39,57.41,1.2549,-49.95,standard
+FDI Adaptive Oscillator Suite,oscillator,fdi_adaptive_oscillator_suite,63,23.3,63.04659498207885,0.3635,0.3635,0.5272401433691756,57254.13,129.56,2.0381,-39.78,standard
+PGO For Loop | mad_tiger_slayer,oscillator,pgo_for_loop_mad_tiger_slayer,71,18.0,63.0,0.363,0.363,0.469,626846.6,0.0,2.04,-17.7,enhanced_pgo_signals
+median supertrend | viResearch,perpetual,median_supertrend_viresearch,41,36.1,62.83154121863799,0.3636,0.3636,0.5308243727598566,115596.61,151.63,2.2661,-25.0,standard
+TS Aggregated Median Absolute Deviation | TobbySimard,perpetual,ts_aggregated_median_absolute_deviation_tobbysimard,5,152.8,62.36559139784946,-0.0271,-0.0271,0.2738351254480287,72.2,7.37,0.3798,-51.07,standard
+dema ema crossover | viResearch,perpetual,dema_ema_crossover_viresearch,32,45.5,62.18637992831542,0.3347,0.3347,0.5222222222222223,2634.08,54.16,1.184,-58.68,standard
+DEMA Percentile Standard Deviation,oscillator,dema_percentile_standard_deviation,47,29.0,60.967741935483865,0.256,0.256,0.489247311827957,98752.47,146.5,2.3541,-23.66,standard
+P-Motion Trend | QuantEdgeB,perpetual,p_motion_trend_quantedgeb,27,55.4,60.93189964157706,0.3245,0.3245,0.5362007168458781,58206.79,130.05,2.1071,-25.94,standard
+dema supertrend | viResearch,perpetual,dema_supertrend_viresearch,58,24.5,60.64516129032258,0.2768,0.2768,0.5089605734767025,279304.61,182.39,2.5853,-22.36,standard
+Normalized DEMA Oscillator SD| QuantEdgeB,oscillator,normalized_dema_oscillator_sd_quantedgeb,38,38.4,60.50179211469534,0.2934,0.2934,0.5225806451612903,6927.72,74.42,1.4666,-54.58,standard
+Sigmoid Trend Confidence Oscillator (STCO),oscillator,sigmoid_trend_confidence_oscillator_stco,38,39.6,60.50179211469534,0.3182,0.3182,0.5390681003584229,15564.49,93.71,1.6995,-48.72,standard
+Kernel Weighted DMI | QuantEdgeB,oscillator,kernel_weighted_dmi_quantedgeb,35,43.8,60.50179211469534,0.3346,0.3346,0.5498207885304659,2646.09,54.25,1.177,-61.32,standard
+Volatility Adaptive Oscillator Suite,oscillator,volatility_adaptive_oscillator_suite,42,37.3,60.0,0.3409,0.3409,0.5620071684587814,40267.63,119.25,1.8802,-61.72,standard
+dema vstop | viResearch,perpetual,dema_vstop_viresearch,28,55.2,58.81720430107527,0.2987,0.2987,0.553763440860215,1668.27,45.62,1.0399,-62.71,standard
+vii`Stop,perpetual,vii_stop,66,21.4,58.63799283154122,0.2229,0.2229,0.5060931899641578,812216.05,224.7,2.9362,-16.57,standard
+Z-Score Adaptive Oscillator Suite,oscillator,z_score_adaptive_oscillator_suite,51,31.0,58.31541218637993,0.3061,0.3061,0.5666666666666667,46590.88,123.46,1.8916,-57.48,standard
+Volume Trend Swing Points | viResearch,perpetual,volume_trend_swing_points_viresearch,24,65.8,57.491039426523294,0.2839,0.2839,0.5655913978494623,57247.76,129.55,2.0589,-26.56,standard
+LSMA ATR | viResearch,perpetual,lsma_atr_viresearch,43,32.3,56.451612903225815,0.1556,0.1556,0.4971326164874552,39872.99,118.96,2.0736,-31.96,standard
+Hull SuperTrend - RSI,oscillator,hull_supertrend_rsi,65,21.8,45.376344086021504,-0.1035,-0.1035,0.5075268817204301,-72.58,-15.57,-0.0946,-86.13,standard

@@ -1,0 +1,21 @@
+indicator,normalized,trades,avg_hold_days,coherence_pct,pearson_r,spearman_r,stability,total_return_pct,annualized_return_pct,sharpe_ratio,max_drawdown_pct,category,source
+LSMA Z-Score,lsma_z_score,7,1.0,79.2,-0.001,-0.001,0.003,0.4,0.0,0.59,-2.3,oscillator,todo5_new
+Persistent Parabolic SAR Oscillator,persistent_parabolic_sar_oscillator,25,1.0,78.9605734767025,-0.0012,-0.0012,0.0089605734767025,193.82,15.14,1.5895,-1.74,oscillator,todo5_new
+lsma for loop | viResearch,lsma_for_loop_viresearch,26,41.8,73.33333333333333,0.4277,0.4277,0.3899641577060932,37029.13,116.86,2.184,-25.65,oscillator,todo5_new
+median for loop | viResearch,median_for_loop_viresearch,25,44.0,73.01075268817205,0.4255,0.4255,0.3946236559139785,8117.47,78.03,1.677,-29.81,oscillator,todo5_new
+hull for loop | viResearch,hull_for_loop_viresearch,21,54.3,71.75627240143369,0.4123,0.4123,0.4086021505376344,3795.92,61.47,1.4179,-37.32,oscillator,todo5_new
+dema dmi | viResearch,dema_dmi_viresearch,27,44.8,70.60931899641577,0.4173,0.4173,0.4336917562724014,4930.81,66.96,1.4756,-32.5,perpetual,todo5_new
+Two Pole Butterworth For Loop,two_pole_butterworth_for_loop,23,52.0,69.9,0.402,0.402,0.432,2151.8,0.0,1.18,-46.5,oscillator,todo5_new
+Fourier For Loop,fourier_for_loop,24,50.0,69.7,0.398,0.398,0.428,16921.5,0.0,1.9,-27.1,oscillator,todo5_new
+mode for loop | viResearch,mode_for_loop_viresearch,26,46.9,69.24731182795699,0.3882,0.3882,0.4372759856630824,18697.18,98.38,1.8965,-26.72,oscillator,todo5_new
+Median RSI SD| QuantEdgeB,median_rsi_sd_quantedgeb,21,61.9,69.10394265232975,0.4244,0.4244,0.4659498207885305,2182.9,50.56,1.186,-52.57,oscillator,todo5_new
+DSMA | viResearch,dsma_viresearch,53,24.0,68.5663082437276,0.3975,0.3975,0.4562724014336917,39117.58,118.42,2.1722,-25.65,perpetual,todo4_current
+DEMA RSI Overlay,dema_rsi_overlay,25,50.0,68.5,0.385,0.385,0.449,5679.8,0.0,1.5,-37.4,perpetual,todo5_new
+Inverted SD Dema RSI | viResearch,inverted_sd_dema_rsi_viresearch,25,50.2,68.45878136200717,0.3853,0.3853,0.4494623655913978,5679.79,70.02,1.4974,-37.41,perpetual,todo5_new
+Adaptive Gaussian MA For Loop,adaptive_gaussian_ma_for_loop,23,55.0,68.4,0.383,0.383,0.453,7189.9,0.0,1.5,-31.9,oscillator,todo5_new
+Double Src SMA Standard Deviation | viResearch,double_src_sma_standard_deviation_viresearch,55,23.3,68.13620071684588,0.3918,0.3918,0.4598566308243728,38412.64,117.9,2.1565,-25.65,perpetual,todo5_new
+DEMA SMA Standard Deviation | viResearch,dema_sma_standard_deviation_viresearch,56,22.9,68.06451612903226,0.3901,0.3901,0.4598566308243728,36822.64,116.7,2.1378,-25.65,perpetual,todo5_new
+Median Standard Deviation | viResearch,median_standard_deviation_viresearch,46,27.5,67.70609318996415,0.3721,0.3721,0.4534050179211469,339035.1,189.64,2.7647,-25.65,perpetual,todo5_new
+HILO Interpolation | QuantEdgeB,hilo_interpolation_quantedgeb,38,33.6,67.1326164874552,0.3639,0.3639,0.4577060931899641,61641.46,131.78,2.2398,-23.66,perpetual,todo4_current
+Z SMMA | QuantEdgeB,z_smma_quantedgeb,27,54.0,64.51612903225806,0.393,0.393,0.5225806451612903,3136.22,57.6,1.2452,-59.23,oscillator,todo5_new
+FDI Adaptive Oscillator Suite,fdi_adaptive_oscillator_suite,63,23.3,63.04659498207885,0.3635,0.3635,0.5272401433691756,57254.13,129.56,2.0381,-39.78,oscillator,todo5_new

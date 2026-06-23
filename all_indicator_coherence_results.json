@@ -1,0 +1,756 @@
+[
+  {
+    "indicator": "polynomial_deviation_bands",
+    "category": "perpetual",
+    "coherence": 85.5574,
+    "params": {
+      "regressions_length": 60,
+      "dev_lookback": 60
+    }
+  },
+  {
+    "indicator": "gaussian_smooth_trend_quantedgeb",
+    "category": "perpetual",
+    "coherence": 84.75,
+    "params": {
+      "len_sd": 60,
+      "len_s": 60
+    }
+  },
+  {
+    "indicator": "alma_lag_viresearch",
+    "category": "perpetual",
+    "coherence": 84.68,
+    "params": {
+      "len_subject": 180
+    }
+  },
+  {
+    "indicator": "adaptive_regime_cloud",
+    "category": "perpetual",
+    "coherence": 84.56,
+    "params": {
+      "lookback": 40,
+      "adaptive_period": 100
+    }
+  },
+  {
+    "indicator": "root_mean_square_deviation_trend",
+    "category": "perpetual",
+    "coherence": 83.9418,
+    "params": {
+      "length": 50
+    }
+  },
+  {
+    "indicator": "p_motion_trend_quantedgeb",
+    "category": "perpetual",
+    "coherence": 83.68,
+    "params": {
+      "sd_length": 60
+    },
+    "all_tested": [
+      {
+        "params": "default",
+        "coherence": 74.475
+      },
+      {
+        "params": {
+          "sd_length": 20
+        },
+        "coherence": 71.664
+      },
+      {
+        "params": {
+          "sd_length": 30
+        },
+        "coherence": 74.475
+      },
+      {
+        "params": {
+          "sd_length": 40
+        },
+        "coherence": 77.2536
+      },
+      {
+        "params": {
+          "sd_length": 50
+        },
+        "coherence": 81.0662
+      },
+      {
+        "params": {
+          "sd_length": 60
+        },
+        "coherence": 83.6834
+      }
+    ]
+  },
+  {
+    "indicator": "z_smma_quantedgeb",
+    "category": "oscillator",
+    "coherence": 83.49,
+    "params": {
+      "len_z": 100
+    }
+  },
+  {
+    "indicator": "median_rsi_sd_quantedgeb",
+    "category": "oscillator",
+    "coherence": 83.33,
+    "params": {
+      "len_rsi": 40,
+      "len_median": 10
+    }
+  },
+  {
+    "indicator": "dema_adjusted_average_true_range",
+    "category": "perpetual",
+    "coherence": 83.0,
+    "params": {}
+  },
+  {
+    "indicator": "madtrend_investorunknown",
+    "category": "perpetual",
+    "coherence": 82.94,
+    "params": {
+      "length": 60
+    },
+    "all_tested": [
+      {
+        "params": "default",
+        "coherence": 73.5703
+      },
+      {
+        "params": {
+          "length": 20
+        },
+        "coherence": 68.5299
+      },
+      {
+        "params": {
+          "length": 30
+        },
+        "coherence": 74.7334
+      },
+      {
+        "params": {
+          "length": 40
+        },
+        "coherence": 78.4168
+      },
+      {
+        "params": {
+          "length": 50
+        },
+        "coherence": 80.8401
+      },
+      {
+        "params": {
+          "length": 60
+        },
+        "coherence": 82.9402
+      }
+    ]
+  },
+  {
+    "indicator": "dema_sma_standard_deviation_viresearch",
+    "category": "perpetual",
+    "coherence": 82.81,
+    "params": {
+      "len_dema": 20,
+      "len_ma": 80
+    }
+  },
+  {
+    "indicator": "irs_elder_force_volume_index",
+    "category": "perpetual",
+    "coherence": 82.07,
+    "params": {
+      "length": 60
+    }
+  },
+  {
+    "indicator": "dema_dmi_viresearch",
+    "category": "perpetual",
+    "coherence": 81.65,
+    "params": {
+      "len_dema": 60
+    }
+  },
+  {
+    "indicator": "kalman_filtered_rsi_oscillator",
+    "category": "oscillator",
+    "coherence": 81.454,
+    "params": {
+      "process_noise": 0.01,
+      "measurement_noise": 3.0,
+      "n": 5,
+      "rsi_period": 20,
+      "smooth": false,
+      "mode_switch": "Ema",
+      "smoothlen": 7
+    }
+  },
+  {
+    "indicator": "dsma_viresearch",
+    "category": "perpetual",
+    "coherence": 81.26,
+    "params": {
+      "len_sma": 60,
+      "len_dsma": 10
+    }
+  },
+  {
+    "indicator": "volatility_adaptive_oscillator_suite",
+    "category": "oscillator",
+    "coherence": 81.2,
+    "params": {
+      "rsi_len": 50,
+      "cci_len": 70,
+      "cmo_len": 60
+    }
+  },
+  {
+    "indicator": "double_src_sma_standard_deviation_viresearch",
+    "category": "perpetual",
+    "coherence": 81.2,
+    "params": {
+      "len_ma": 60,
+      "len_sd": 50
+    }
+  },
+  {
+    "indicator": "adaptive_gaussian_ma_for_loop",
+    "category": "oscillator",
+    "coherence": 81.1,
+    "params": {
+      "length": 60
+    }
+  },
+  {
+    "indicator": "hilo_interpolation_quantedgeb",
+    "category": "perpetual",
+    "coherence": 81.07,
+    "params": {
+      "prcl_len": 60
+    }
+  },
+  {
+    "indicator": "z_score_adaptive_oscillator_suite",
+    "category": "oscillator",
+    "coherence": 80.65,
+    "params": {
+      "rsi_len": 60,
+      "cci_len": 60,
+      "cmo_len": 80
+    }
+  },
+  {
+    "indicator": "enhanced_kijun_sen_base",
+    "category": "perpetual",
+    "coherence": 80.19,
+    "params": {
+      "smf": "%OR",
+      "per": 26,
+      "ma_length": 50,
+      "kijun_sen_base_period": 50
+    }
+  },
+  {
+    "indicator": "dema_ema_crossover_viresearch",
+    "category": "perpetual",
+    "coherence": 79.81,
+    "params": {
+      "len_dema": 60
+    }
+  },
+  {
+    "indicator": "median_deviation_suite_investorunknown",
+    "category": "perpetual",
+    "coherence": 79.71,
+    "params": {
+      "median_len": 60
+    },
+    "all_tested": [
+      {
+        "params": "default",
+        "coherence": 71.9548
+      },
+      {
+        "params": {
+          "median_len": 20
+        },
+        "coherence": 68.4006
+      },
+      {
+        "params": {
+          "median_len": 30
+        },
+        "coherence": 72.7625
+      },
+      {
+        "params": {
+          "median_len": 40
+        },
+        "coherence": 76.7044
+      },
+      {
+        "params": {
+          "median_len": 50
+        },
+        "coherence": 76.769
+      },
+      {
+        "params": {
+          "median_len": 60
+        },
+        "coherence": 79.7092
+      }
+    ]
+  },
+  {
+    "indicator": "dema_rsi_overlay",
+    "category": "perpetual",
+    "coherence": 79.45,
+    "params": {
+      "sublen": 50
+    }
+  },
+  {
+    "indicator": "inverted_sd_dema_rsi_viresearch",
+    "category": "perpetual",
+    "coherence": 79.45,
+    "params": {
+      "dema_length": 50,
+      "sd_length": 50
+    }
+  },
+  {
+    "indicator": "kernel_weighted_dmi_quantedgeb",
+    "category": "oscillator",
+    "coherence": 79.3538,
+    "params": {
+      "len_dmi": 50,
+      "kernel_filter": "Linear",
+      "len_kernel": 20,
+      "lu": 1,
+      "su": -1
+    }
+  },
+  {
+    "indicator": "normalised_t3_oscillator",
+    "category": "oscillator",
+    "coherence": 79.35,
+    "params": {
+      "default": true
+    }
+  },
+  {
+    "indicator": "median_supertrend_viresearch",
+    "category": "perpetual",
+    "coherence": 79.26,
+    "params": {
+      "median_length": 60
+    },
+    "all_tested": [
+      {
+        "params": "default",
+        "coherence": 72.9241
+      },
+      {
+        "params": {
+          "median_length": 20
+        },
+        "coherence": 74.9273
+      },
+      {
+        "params": {
+          "median_length": 30
+        },
+        "coherence": 75.4766
+      },
+      {
+        "params": {
+          "median_length": 40
+        },
+        "coherence": 76.9628
+      },
+      {
+        "params": {
+          "median_length": 50
+        },
+        "coherence": 78.4168
+      },
+      {
+        "params": {
+          "median_length": 60
+        },
+        "coherence": 79.2569
+      }
+    ]
+  },
+  {
+    "indicator": "hull_for_loop_viresearch",
+    "category": "oscillator",
+    "coherence": 79.1922,
+    "params": {
+      "length": 15,
+      "x": 1,
+      "y": 50,
+      "threshold_l": 49,
+      "threshold_s": -10
+    }
+  },
+  {
+    "indicator": "fourier_for_loop",
+    "category": "oscillator",
+    "coherence": 79.06,
+    "params": {
+      "n": 1
+    }
+  },
+  {
+    "indicator": "mode_for_loop_viresearch",
+    "category": "oscillator",
+    "coherence": 79.06,
+    "params": {
+      "length": 20
+    }
+  },
+  {
+    "indicator": "lsma_for_loop_viresearch",
+    "category": "oscillator",
+    "coherence": 78.3199,
+    "params": {
+      "length": 2,
+      "a": 10,
+      "b": 60,
+      "threshold_l": 40,
+      "threshold_s": 17
+    }
+  },
+  {
+    "indicator": "median_for_loop_viresearch",
+    "category": "oscillator",
+    "coherence": 78.26,
+    "params": {
+      "default": true
+    }
+  },
+  {
+    "indicator": "normalized_dema_oscillator_sd_quantedgeb",
+    "category": "oscillator",
+    "coherence": 78.09,
+    "params": {
+      "len_dema": 60,
+      "base_len": 30
+    }
+  },
+  {
+    "indicator": "fdi_adaptive_oscillator_suite",
+    "category": "oscillator",
+    "coherence": 77.8,
+    "params": {
+      "fdi_len": 60
+    }
+  },
+  {
+    "indicator": "ewma_viresearch",
+    "category": "perpetual",
+    "coherence": 77.74,
+    "params": {
+      "length": 40
+    }
+  },
+  {
+    "indicator": "ts_aggregated_median_absolute_deviation_tobbysimard",
+    "category": "perpetual",
+    "coherence": 77.7383,
+    "params": {}
+  },
+  {
+    "indicator": "median_standard_deviation_viresearch",
+    "category": "perpetual",
+    "coherence": 77.38,
+    "params": {
+      "median_len": 60
+    },
+    "all_tested": [
+      {
+        "params": "default",
+        "coherence": 77.3183
+      },
+      {
+        "params": {
+          "median_len": 20
+        },
+        "coherence": 62.8756
+      },
+      {
+        "params": {
+          "median_len": 30
+        },
+        "coherence": 66.4943
+      },
+      {
+        "params": {
+          "median_len": 40
+        },
+        "coherence": 71.0178
+      },
+      {
+        "params": {
+          "median_len": 50
+        },
+        "coherence": 74.6042
+      },
+      {
+        "params": {
+          "median_len": 60
+        },
+        "coherence": 77.3829
+      }
+    ]
+  },
+  {
+    "indicator": "adaptive_volatility_controlled_lsma_quantalgo",
+    "category": "perpetual",
+    "coherence": 77.09,
+    "params": {
+      "len_lsma": 150
+    }
+  },
+  {
+    "indicator": "dema_vstop_viresearch",
+    "category": "perpetual",
+    "coherence": 75.7,
+    "params": {
+      "dema_length": 60,
+      "vstop_length": 10,
+      "multiplier": 2.0
+    }
+  },
+  {
+    "indicator": "volume_trend_swing_points_viresearch",
+    "category": "perpetual",
+    "coherence": 75.4443,
+    "params": {
+      "x": 50,
+      "y": 30
+    }
+  },
+  {
+    "indicator": "linear_st_quantedgeb",
+    "category": "perpetual",
+    "coherence": 75.41,
+    "params": {
+      "len_perc": 60,
+      "len_lsma": 60
+    }
+  },
+  {
+    "indicator": "dmi_forloop",
+    "category": "oscillator",
+    "coherence": 75.06,
+    "params": {
+      "a": 30,
+      "b": 37
+    }
+  },
+  {
+    "indicator": "quantile_dema_trend_quantedgeb",
+    "category": "perpetual",
+    "coherence": 74.6042,
+    "params": {
+      "len_dema": 60,
+      "len_perc": 20,
+      "len_atr": 20
+    }
+  },
+  {
+    "indicator": "lsma_z_score",
+    "category": "oscillator",
+    "coherence": 73.3441,
+    "params": {
+      "length": 30,
+      "lookback": 30,
+      "show_divergences": true,
+      "lb_r": 10,
+      "lb_l": 10
+    }
+  },
+  {
+    "indicator": "dema_percentile_standard_deviation",
+    "category": "oscillator",
+    "coherence": 71.57,
+    "params": {
+      "dema_len": 60
+    }
+  },
+  {
+    "indicator": "dema_supertrend_viresearch",
+    "category": "perpetual",
+    "coherence": 71.02,
+    "params": {
+      "subject": 14,
+      "multiplier": 3.35,
+      "dema_length": 9
+    }
+  },
+  {
+    "indicator": "dega_rma_quantedgeb",
+    "category": "perpetual",
+    "coherence": 69.31,
+    "params": {
+      "len_dema": 60
+    }
+  },
+  {
+    "indicator": "vii_stop",
+    "category": "perpetual",
+    "coherence": 69.2084,
+    "params": {
+      "length": 20,
+      "multiplier": 3.5
+    }
+  },
+  {
+    "indicator": "lsma_viresearch",
+    "category": "perpetual",
+    "coherence": 69.14,
+    "params": {
+      "default": true
+    },
+    "all_tested": [
+      {
+        "params": "default",
+        "coherence": 69.1438
+      },
+      {
+        "params": {
+          "len_lsma": 20
+        },
+        "coherence": 56.0258
+      },
+      {
+        "params": {
+          "len_lsma": 30
+        },
+        "coherence": 59.3861
+      },
+      {
+        "params": {
+          "len_lsma": 40
+        },
+        "coherence": 61.9063
+      },
+      {
+        "params": {
+          "len_lsma": 50
+        },
+        "coherence": 62.3263
+      },
+      {
+        "params": {
+          "len_lsma": 60
+        },
+        "coherence": 65.3312
+      }
+    ]
+  },
+  {
+    "indicator": "pgo_for_loop_mad_tiger_slayer",
+    "category": "oscillator",
+    "coherence": 60.32,
+    "params": {
+      "pgo_length": 60,
+      "pgo_type": "EMA"
+    }
+  },
+  {
+    "indicator": "persistent_parabolic_sar_oscillator",
+    "category": "oscillator",
+    "coherence": 60.29,
+    "params": {
+      "start": 0.005,
+      "inc": 0.0005,
+      "max_val": 0.1
+    }
+  },
+  {
+    "indicator": "smooth_rsi",
+    "category": "oscillator",
+    "coherence": 60.02,
+    "params": {
+      "length": 40,
+      "length_ema": 14,
+      "length_c": 11
+    }
+  },
+  {
+    "indicator": "two_pole_butterworth_for_loop",
+    "category": "oscillator",
+    "coherence": 58.75,
+    "params": {
+      "lookback": 60,
+      "start": 1,
+      "end": 60
+    }
+  },
+  {
+    "indicator": "sigmoid_trend_confidence_oscillator_stco",
+    "category": "oscillator",
+    "coherence": 58.11,
+    "params": {
+      "short_period": 10,
+      "med_period": 25,
+      "long_period": 30,
+      "use_smoothing": true,
+      "smooth_len": 5
+    }
+  },
+  {
+    "indicator": "lsma_atr_viresearch",
+    "category": "perpetual",
+    "coherence": 55.38,
+    "params": {}
+  },
+  {
+    "indicator": "rsi_convergence_divergence",
+    "category": "oscillator",
+    "coherence": 53.38,
+    "params": {
+      "fast_length": 14,
+      "slow_length": 40
+    }
+  },
+  {
+    "indicator": "fisher_forloop",
+    "category": "oscillator",
+    "coherence": 52.47,
+    "params": {
+      "a": 60,
+      "b": 64
+    }
+  },
+  {
+    "indicator": "momentum_zenith_guide",
+    "category": "oscillator",
+    "coherence": 50.27,
+    "params": {
+      "default": true
+    }
+  },
+  {
+    "indicator": "hull_supertrend_rsi",
+    "category": "oscillator",
+    "coherence": 49.7254,
+    "params": {
+      "rsi_length": 14,
+      "smoothing_length": 21,
+      "atr_length": 9,
+      "trend_factor": 0.9
+    }
+  }
+]

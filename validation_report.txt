@@ -1,0 +1,134 @@
+================================================================================
+MTTD TRADING SYSTEM — VALIDATION REPORT
+================================================================================
+Generated: 2026-06-23 06:03:59
+
+================================================================================
+FINAL VERDICT: ✗ FAIL
+================================================================================
+
+FAIL: Coherence=74.19% (FAIL>=95.0%), MaxDD=53.97% (FAIL<15.0%)
+
+Criteria:
+  ✗ coherence: 74.19% (required: >= 95.0%)
+  ✗ max_drawdown: 53.97% (required: < 15.0%)
+  ✓ walk_forward: 7 cycles (required: >= 3 cycles)
+  ✗ walk_forward_coherence: 76.11% (required: OOS coherence >= 95.0%)
+
+────────────────────────────────────────────────────────────────────────────────
+ISP BENCHMARK COMPARISON
+────────────────────────────────────────────────────────────────────────────────
+  ISP CAGR:           130.66%
+  ISP Total Trades:   28
+  ISP Years:          9.82
+  ISP Data Range:     2015-10-28 to 2025-08-21
+  ISP Regimes:        {'Weak Bull': 14, 'Strong Bull': 7, 'Neutral': 7}
+
+  System CAGR:        16.30%
+  System Total Return:259.33%
+  System Years:       8.47
+  System Final Equity:359,333.97
+
+  CAGR Difference:    -114.36%
+  ISP Trades:         28
+  System Trades:      0
+
+────────────────────────────────────────────────────────────────────────────────
+RISK METRICS
+────────────────────────────────────────────────────────────────────────────────
+  Max Drawdown:       -53.97%
+  Sharpe Ratio:       0.6366
+  Sortino Ratio:      0.5410
+  Daily Volatility:   1.6447%
+  Calmar Ratio:       0.3020
+  Annualized Return:  16.30%
+  Final Equity:       359,333.97
+  Total Trades:       33
+
+  Risk Management:
+    Max DD Pause:     15.0%
+    Pause Days:       20
+    Bars in Pause:    1480
+    % Time in Mkt:    34.02%
+
+────────────────────────────────────────────────────────────────────────────────
+COHERENCE WITH ISP BENCHMARK
+────────────────────────────────────────────────────────────────────────────────
+  Time Coherence:     74.19% ✗ FAIL
+  Bars in Agreement:  2070 / 2790
+  Bars Disagreement:  720
+  Both In Market:     31.11%
+  Both Out of Market: 43.08%
+  MTTD In, ISP Out:   1.94%
+  MTTD Out, ISP In:   23.87%
+
+  Timing Error:
+    Avg Entry Error:  136.57 days
+    Avg Exit Error:   4.71 days
+    MTTD Trades:      33
+    ISP Trades:       7
+
+  Return Correlation:
+    Pearson:          0.6801
+    Spearman:         0.7241
+    Common Days:      2790
+
+────────────────────────────────────────────────────────────────────────────────
+WALK-FORWARD VALIDATION SUMMARY
+────────────────────────────────────────────────────────────────────────────────
+  Walk-Forward Verdict: ✗ FAIL
+  Average OOS coherence: 76.11% (FAIL >= 95%), Cycles: 7 (PASS >= 3)
+  Cycles Completed:  7
+  Min Cycles Met:    Yes
+
+  In-Sample Coherence (Training):
+    Mean: 84.06%  Min: 77.63%  Max: 89.04%  Std: 3.74%
+
+  Out-of-Sample Coherence (Test):
+    Mean: 76.11%  Min: 58.08%  Max: 89.32%  Std: 11.60%
+
+  Returns (Test Periods):
+    Mean Test Return:     72.94%
+    Mean Annual Return:   72.78%
+    Best Test Return:     283.81%
+    Worst Test Return:    -44.32%
+
+  Risk (Test Periods):
+    Mean Max Drawdown:    -28.00%
+    Worst Max Drawdown:   -44.81%
+    Mean Sharpe Ratio:    1.0075
+
+  Cycle   Test Period               IS Coh%    OOS Coh%   Return%    MaxDD%     Sharpe  
+  ────────────────────────────────────────────────────────────────────────────────
+  1       2019-01-01 to 2019-12-31  89.04      87.12      63.43      -43.27     1.1695  
+  2       2020-01-01 to 2020-12-31  88.22      73.77      283.81     -15.07     3.0846  
+  3       2021-01-01 to 2021-12-31  83.39      89.32      80.40      -25.80     1.3719  
+  4       2022-01-01 to 2022-12-31  85.01      79.73      -44.32     -44.81     -1.7877 
+  5       2023-01-01 to 2023-12-31  84.67      58.08      49.54      -21.23     1.4552  
+  6       2024-01-01 to 2024-12-31  80.47      60.66      75.53      -26.25     1.5526  
+  7       2025-01-01 to 2025-12-31  77.63      84.12      2.16       -19.56     0.2067  
+
+  Overfitting Analysis:
+    Mean Coherence Gap:  7.95%
+    Coherence Stability: 11.60% (std)
+    Avg Overfit Ratio:   0.9067 (OOS/IS)
+
+────────────────────────────────────────────────────────────────────────────────
+ENSEMBLE CONFIGURATION
+────────────────────────────────────────────────────────────────────────────────
+  Threshold:          -0.5000
+  EMA Length:         5
+  N Indicators:       15
+  % Time in Position: 57.45%
+  Total Trades:       40
+  Look-Ahead Check:   FAIL
+
+  Calibration:
+    Optimal Threshold: -0.5000
+    Max Coherence:     90.16%
+    Train Period:      2025-06-22 to 2026-06-22
+    Train Bars:        61
+
+================================================================================
+END OF VALIDATION REPORT
+================================================================================
