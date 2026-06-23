@@ -39,10 +39,10 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
 # Import existing modules
-from mttd.ensemble_engine import compute_ensemble_signal
-from mttd.coherence_metrics import compute_time_coherence, measure_coherence
-from mttd.calibrate_threshold import calibrate_threshold
-from mttd.risk_management import compute_equity_curve, get_risk_metrics
+from ensemble_engine import compute_ensemble_signal
+from coherence_metrics import compute_time_coherence, measure_coherence
+from calibrate_threshold import calibrate_threshold
+from risk_management import compute_equity_curve, get_risk_metrics
 
 
 def generate_walk_forward_cycles(

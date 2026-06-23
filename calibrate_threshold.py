@@ -23,8 +23,8 @@ from typing import Dict, Optional, Tuple, List
 from datetime import datetime, timedelta
 
 # Import ensemble engine and coherence metrics
-from mttd.ensemble_engine import compute_ensemble_signal
-from mttd.coherence_metrics import compute_time_coherence
+from ensemble_engine import compute_ensemble_signal
+from coherence_metrics import compute_time_coherence
 
 
 def compute_coherence_for_threshold(

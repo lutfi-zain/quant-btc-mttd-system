@@ -8,7 +8,7 @@ import json
 import pandas as pd
 import numpy as np
 
-project_root = "/home/ubuntu/projects/quant-technical-indicator-bank"
+project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(project_root)
 from indicators_helper import *
 
@@ -16,11 +16,11 @@ from indicators_helper import *
 os.makedirs(os.path.join(project_root, "mttd"), exist_ok=True)
 
 # Import ensemble engine and supporting modules
-from mttd.ensemble_engine import compute_ensemble_signal, compute_ensemble_with_diagnostics
-from mttd.coherence_metrics import load_isp_positions, measure_coherence, format_coherence_report
-from mttd.calibrate_threshold import calibrate_threshold, format_calibration_report
-from mttd.walk_forward_validate import run_walk_forward_validation, format_walk_forward_report
-from mttd.risk_management import apply_drawdown_pause, compute_equity_curve, get_risk_metrics
+from ensemble_engine import compute_ensemble_signal, compute_ensemble_with_diagnostics
+from coherence_metrics import load_isp_positions, measure_coherence, format_coherence_report
+from calibrate_threshold import calibrate_threshold, format_calibration_report
+from walk_forward_validate import run_walk_forward_validation, format_walk_forward_report
+from risk_management import apply_drawdown_pause, compute_equity_curve, get_risk_metrics
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "data")
 CACHE_FILE = os.path.join(CACHE_DIR, "btc_daily.json")
@@ -171,6 +171,15 @@ def detect_direction_series(res_df):
             if len(unique_vals) <= 10:
                 return res_df[col]
                 
+    # For single-column indicators, interpret positive values as bullish
+    if len(res_df.columns) == 1:
+        col = res_df.columns[0]
+        return res_df[col].apply(lambda x: 1.0 if x > 0 else -1.0 if x < 0 else 0.0)
+    
+    # For two-column indicators with dema_atr and moving_average
+    if 'dema_atr' in res_df.columns and 'moving_average' in res_df.columns:
+        return (res_df['dema_atr'] > res_df['moving_average']).astype(float) * 2 - 1
+    
     return None
 
 def clean_value(val):

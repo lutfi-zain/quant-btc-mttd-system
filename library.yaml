@@ -1,0 +1,330 @@
+# Technical Indicator Library Table
+# 
+# Column Specifications & Allowed Types:
+# - indicator: string (Name of the technical indicator)
+# - author: string (Creator/author of the Pine Script)
+# - link: string (URL to the TradingView script page)
+# - status: string (Fetch status; Allowed values: 'fetched', 'unfetched', 'script not available')
+
+perpetual:
+- indicator: DEMA Adjusted Average True Range
+  author: BackQuant
+  link: https://www.tradingview.com/script/FqwJYrJP-DEMA-Adjusted-Average-True-Range-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: DEMA RSI Overlay
+  author: BackQuant
+  link: https://www.tradingview.com/script/YJ1WIIFb-DEMA-RSI-Overlay-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: Adaptive Regime Cloud
+  author: Code2Capital
+  link: https://www.tradingview.com/script/23ILmPat-Adaptive-Regime-Cloud/
+  status: fetched
+  conversion_status: converted
+- indicator: MadTrend | InvestorUnknown
+  author: InvestorUnknown
+  link: https://www.tradingview.com/script/nhyCYGKn-MadTrend-InvestorUnknown/
+  status: fetched
+  conversion_status: converted
+- indicator: Median Deviation Suite | InvestorUnknown
+  author: InvestorUnknown
+  link: https://www.tradingview.com/script/jhoPkiLx-Median-Deviation-Suite-InvestorUnknown/
+  status: fetched
+  conversion_status: converted
+- indicator: Polynomial Deviation Bands
+  author: MintLeafEdge
+  link: https://www.tradingview.com/script/u92vNY7X-Polynomial-Deviation-Bands/
+  status: fetched
+  conversion_status: converted
+- indicator: Adaptive Volatility Controlled LSMA | QuantAlgo
+  author: QuantAlgo
+  link: https://www.tradingview.com/script/jKk8KDHk-Adaptive-Volatility-Controlled-LSMA-QuantAlgo/
+  status: fetched
+  conversion_status: converted
+- indicator: Enhanced Kijun Sen Base
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/lHNPz8Gq-Enhanced-Kijun-Sen-Base/
+  status: fetched
+  conversion_status: converted
+- indicator: Gaussian Smooth Trend | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/yanZWp7u-Gaussian-Smooth-Trend-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: Gaussian Volume-Weighted Deviation
+  author: QuantumResearch
+  link: https://www.tradingview.com/script/BmhDSaF0-GVWD-QuantumResearch/
+  status: script not available
+  conversion_status: not applicable
+- indicator: Gaussian Moving Average Deviation
+  author: QuantumResearch
+  link: https://www.tradingview.com/script/1ZPtPfMc-GEMAD-QuantumResearch/
+  status: script not available
+  conversion_status: not applicable
+- indicator: TS Aggregated Median Absolute Deviation | TobbySimard
+  author: TobbySimard
+  link: https://www.tradingview.com/script/bvNxTj4C-TS-Aggregated-Median-Absolute-Deviation/
+  status: fetched
+  conversion_status: converted
+- indicator: Median Standard Deviation | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/ywl57T7A-Median-Standard-Deviation-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: alma lag | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/kSU07jis-alma-lag-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: lsma | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/xWZTGnUy-Lsma-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: LSMA ATR | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/RVg6f4D8-Lsma-ATR-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: Double Src SMA Standard Deviation | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/xPfKijNT-Double-Src-SMA-Standard-Deviation-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: DEMA SMA Standard Deviation | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/WexMT4w3-DEMA-SMA-Standard-Deviation-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: DSMA | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/8tsUeCGq-DSMA-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: IRS`Elder Force Volume Index
+  author: viResearch
+  link: https://www.tradingview.com/script/ludCBuVk-IRS-Elder-Force-Volume-Index/
+  status: fetched
+  conversion_status: converted
+- indicator: vii`Stop
+  author: viResearch
+  link: https://www.tradingview.com/script/cT7O5AAq-vii-Stop/
+  status: fetched
+  conversion_status: converted
+- indicator: ewma | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/oJuwJnQe-Ewma-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: dema ema crossover | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/q3agCC58-Dema-Ema-Crossover-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: dema vstop | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/G3eTG18L-Dema-Vstop-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: median supertrend | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/77iO5mlc-Median-Supertrend-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: dema dmi | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/rzPRTDQu-Dema-DMI-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: dema supertrend | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/YihvBGxm-Dema-Supertrend-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: rsi sd | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/yToEVFQW-rsi-sd-viResearch/
+  status: script not available
+  conversion_status: not applicable
+- indicator: Inverted SD Dema RSI | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/OHJIqTzp-Inverted-SD-Dema-RSI-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: Volume Trend Swing Points | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/oGM8qJqv-Volume-Trend-Swing-Points-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: Root Mean Square Deviation Trend
+  author: InvestorUnknown
+  link: https://www.tradingview.com/script/7GzOiU0f-RMSD-Trend-InvestorUnknown/
+  status: fetched
+  conversion_status: converted
+- indicator: DEGA RMA | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/44qjD1Of-DEGA-RMA-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: P-Motion Trend | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/Zdtfv3yc-P-Motion-Trend-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: Linear % ST | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/BwikKD5F-Linear-ST-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: Quantile DEMA Trend | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/CvRWMQu5-Quantile-DEMA-Trend-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: HILO Interpolation | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/erp4e4FH-HILO-Interpolation-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+oscillator:
+- indicator: Kalman Filtered RSI Oscillator
+  author: BackQuant
+  link: https://www.tradingview.com/script/0YrX18dJ-Kalman-Filtered-RSI-Oscillator-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: LSMA Z-Score
+  author: BackQuant
+  link: https://www.tradingview.com/script/TK5wPSVX-LSMA-Z-Score-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: Normalised T3 Oscillator
+  author: BackQuant
+  link: https://www.tradingview.com/script/jwgmlPbq-Normalised-T3-Oscillator-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: Hull SuperTrend - RSI
+  author: DCAQuant
+  link: https://www.tradingview.com/script/cGVvoDWa-Hull-SuperTrend-RSI-DCAquant/
+  status: fetched
+  conversion_status: converted
+- indicator: Persistent Parabolic SAR Oscillator
+  author: DCAquant
+  link: https://www.tradingview.com/script/gtMzFy24-Persistent-Parabolic-SAR-Oscillator-DCAquant/
+  status: fetched
+  conversion_status: converted
+- indicator: Momentum Zenith Guide
+  author: DCAquant
+  link: https://www.tradingview.com/script/AvJUGXeX-Momentum-Zenith-Guide-DCAquant/
+  status: fetched
+  conversion_status: converted
+- indicator: Smooth RSI
+  author: MarktQuant
+  link: https://www.tradingview.com/script/Dbm2qdnS-Smooth-RSI-MarktQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: DEMA Percentile Standard Deviation
+  author: Patito_1
+  link: https://www.tradingview.com/script/1F9gYGDH-Dema-Percentile-Standard-Deviation/
+  status: fetched
+  conversion_status: converted
+- indicator: FDI Adaptive Oscillator Suite
+  author: MintLeafEdge
+  link: https://www.tradingview.com/script/zhdntwot-FDI-Adaptive-Oscillator-Suite/
+  status: fetched
+  conversion_status: converted
+- indicator: Volatility Adaptive Oscillator Suite
+  author: MintLeafEdge
+  link: https://www.tradingview.com/script/H4Dep663-Volatility-Adaptive-Oscillator-Suite/
+  status: fetched
+  conversion_status: converted
+- indicator: Z-Score Adaptive Oscillator Suite
+  author: MintLeafEdge
+  link: https://www.tradingview.com/script/8Ntk4TVY-Z-Score-Adaptive-Oscillator-Suite/
+  status: fetched
+  conversion_status: converted
+- indicator: Sigmoid Trend Confidence Oscillator (STCO)
+  author: MintLeafEdge
+  link: https://www.tradingview.com/script/xL76WKRR-Sigmoid-Trend-Confidence-Oscillator-STCO/
+  status: fetched
+  conversion_status: converted
+- indicator: PGO For Loop | mad_tiger_slayer
+  author: mad_tiger_slayer
+  link: https://www.tradingview.com/script/4pyhqvd9-PGO-For-Loop-mad-tiger-slayer/
+  status: fetched
+  conversion_status: converted
+- indicator: RSI Convergence Divergence
+  author: Rick996
+  link: https://www.tradingview.com/script/b0paQvAN-RSI-Convergence-Divergence/
+  status: fetched
+  conversion_status: converted
+- indicator: RTI For Loop | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/UNJsxpMS-RTI-For-Loop-viResearch/
+  status: script not available
+  conversion_status: not applicable
+- indicator: median for loop | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/V63HaPE4-Median-For-Loop-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: hull for loop | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/CMsOR65t-Hull-For-Loop-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: mode for loop | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/tlvOnUCf-Mode-For-Loop-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: lsma for loop | viResearch
+  author: viResearch
+  link: https://www.tradingview.com/script/izlp0pqd-Lsma-For-Loop-viResearch/
+  status: fetched
+  conversion_status: converted
+- indicator: DMI ForLoop
+  author: InvestorUnknown
+  link: https://www.tradingview.com/script/aoadTINE-DMI-ForLoop-InvestorUnknown/
+  status: fetched
+  conversion_status: converted
+- indicator: Fisher ForLoop
+  author: InvestorUnknown
+  link: https://www.tradingview.com/script/5mnjLS2x-Fisher-ForLoop-InvestorUnknown/
+  status: fetched
+  conversion_status: converted
+- indicator: Adaptive Gaussian MA For Loop
+  author: BackQuant
+  link: https://www.tradingview.com/script/tbMiCNiz-Adaptive-Gaussian-MA-For-Loop-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: Two Pole Butterworth For Loop
+  author: BackQuant
+  link: https://www.tradingview.com/script/Y9LqrYaU-Two-Pole-Butterworth-For-Loop-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: Fourier For Loop
+  author: BackQuant
+  link: https://www.tradingview.com/script/Er0Bf8yW-Fourier-For-Loop-BackQuant/
+  status: fetched
+  conversion_status: converted
+- indicator: Median RSI SD| QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/iI4rCy2S-Median-RSI-SD-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: Z SMMA | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/8I50ufPD-Z-SMMA-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: Normalized DEMA Oscillator SD| QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/ofTLtwIe-Normalized-DEMA-Oscillator-SD-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
+- indicator: Kernel Weighted DMI | QuantEdgeB
+  author: QuantEdgeB
+  link: https://www.tradingview.com/script/c5oBhlZL-Kernel-Weighted-DMI-QuantEdgeB/
+  status: fetched
+  conversion_status: converted
