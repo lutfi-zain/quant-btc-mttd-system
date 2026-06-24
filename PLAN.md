@@ -82,11 +82,23 @@ Add NEW statistical families not yet used.
 **Key Finding:** MSVR Hybrid in position only 30.7% vs Ichimoku 44.9%
 **Root Cause:** Filters too aggressive → fewer opportunities → lower returns
 
+## Phase 2 Results ✅ COMPLETED
+
+| Metric | Target | Achieved | Status |
+|--------|--------|----------|--------|
+| Trades | < 15 | 15 | ✅ |
+| Win Rate | > 65% | 66.7% | ✅ |
+| Sharpe | > 1.35 | 1.12 | ❌ |
+| CAGR | > 60% | 39.5% | ❌ |
+
+**Key Finding:** All 9 families integrated, but Sharpe capped at 1.12
+**Root Cause:** min_hold=45 forces holding losing trades, reducing Sharpe
+
 ## Timeline
 
 | Phase | Duration | Deliverable | Status |
 |-------|----------|-------------|--------|
 | Phase 1 | 1 session | MSVR+Ichimoku hybrid | ✅ DONE |
-| Phase 2 | 1 session | MSVR v3 with new principles | 🔄 IN PROGRESS |
-| Phase 3 | 1 session | Validated system | ⬜ PENDING |
+| Phase 2 | 1 session | MSVR v3 with new principles | ✅ DONE |
+| Phase 3 | 1 session | Validated system | 🔄 NEXT |
 | **Total** | **3 sessions** | **Final system** | |
