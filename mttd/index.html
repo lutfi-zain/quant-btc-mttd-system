@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="30">  <!-- Auto-refresh every 30 seconds -->
+    <title>MTTD Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .chart-container {
+            text-align: center;
+        }
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .metric-card h3 {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        .metric-card .value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+        .status {
+            text-align: center;
+            color: #4CAF50;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MTTD Dashboard</h1>
+            <p>Medium-Term Trend following Consensus System</p>
+            <div class="status">● System Active</div>
+        </div>
+        
+        <div class="card">
+            <h2>System Performance Chart</h2>
+            <div class="chart-container">
+                <img src="system_performance.png" alt="MTTD System Performance" 
+                     onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22800%22 height=%22400%22><rect width=%22800%22 height=%22400%22 fill=%22%23f0f0f0%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22Arial%22 font-size=%2220%22 fill=%22%23666%22>Chart not available. Run generate_charts.py first.</text></svg>'">
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Performance Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3>Sharpe Ratio</h3>
+                    <div class="value">0.62</div>
+                </div>
+                <div class="metric-card">
+                    <h3>CAGR</h3>
+                    <div class="value">16.40%</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Max Drawdown</h3>
+                    <div class="value">-56.97%</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Win Rate</h3>
+                    <div class="value">50.00%</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Total Trades</h3>
+                    <div class="value">24</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Avg Hold Period</h3>
+                    <div class="value">47 days</div>
+                </div>
+                <div class="metric-card">
+                    <h3>System Status</h3>
+                    <div class="value" style="color: #4CAF50;">● Active</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Configuration</h3>
+                    <div class="value" style="font-size: 1em;">T75/250 BB25 MH45</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>MTTD System v1.0 | Auto-refreshes every 30 seconds</p>
+            <p>Last updated: 2026-06-24 06:50:22</p>
+        </div>
+    </div>
+</body>
+</html>
