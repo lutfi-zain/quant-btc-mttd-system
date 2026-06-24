@@ -135,6 +135,7 @@ def msvr_enhanced(df: pd.DataFrame,
     # Layer 1: MSVR Base (Family 1: Smoothing)
     # ================================================================
     # Load MSVR indicator
+    import importlib.util
     spec = importlib.util.spec_from_file_location('msvr', 
         '/home/ubuntu/projects/quant-technical-indicator-bank/perpetual/median_standard_deviation_viresearch.py')
     msvr_module = importlib.util.module_from_spec(spec)

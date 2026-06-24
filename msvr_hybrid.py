@@ -150,9 +150,11 @@ def generate_composite_signal(df,
                                cycle_lookback=40,
                                smooth_length=7,
                                entropy_window=15,
-                               entropy_threshold=2.5,
+                               entropy_threshold=1.9,
                                er_period=14,
-                               er_threshold=0.25):
+                               er_threshold=0.30,
+                               confirm_entry=2,
+                               min_hold=5):
     """
     Generate composite signal combining all filters.
     Returns binary position column: 1 = long, 0 = flat.
@@ -179,35 +181,78 @@ def generate_composite_signal(df,
     # 5. Efficiency Ratio Gate
     df['er_gate'] = efficiency_ratio_gate(df['close'], period=er_period, threshold=er_threshold)
     
-    # Composite signal: product of all bullish flags (all must be 1)
-    df['composite_signal'] = (df['msvr_bullish'] * 
-                              df['cycle_bullish'] * 
-                              df['smooth_bullish'] * 
-                              df['entropy_gate'] * 
-                              df['er_gate'])
+    # Core signal: MSVR smoothed direction (like Ichimoku's IMO)
+    df['core_signal'] = df['msvr_bullish'] * df['smooth_bullish']
+    
+    # Entry: core bullish AND (cycle OR er) AND entropy ok
+    # This ensures trend + timing + low noise
+    df['entry_signal'] = (
+        df['core_signal'] * 
+        ((df['cycle_bullish'] + df['er_gate']).clip(upper=1)) * 
+        df['entropy_gate']
+    )
+    
+    # Exit: smoothed MSVR drops below -0.3 (significant momentum loss)
+    # Stay in as long as momentum is reasonably positive
+    df['exit_signal'] = (df['msvr_smooth'] < -0.3).astype(int)
+    
+    # Build position with confirmation logic
+    pos = pd.Series(0, index=df.index)
+    in_position = False
+    hold_days = 0
+    confirm_count = 0
+    
+    for i in range(len(df)):
+        entry = df['entry_signal'].iloc[i]
+        exit_s = df['exit_signal'].iloc[i]
+        
+        if not in_position:
+            # Looking for entry
+            if entry == 1:
+                confirm_count += 1
+                if confirm_count >= confirm_entry:
+                    in_position = True
+                    hold_days = 0
+                    pos.iloc[i] = 1
+            else:
+                confirm_count = 0
+        else:
+            # In position - track hold and exit
+            hold_days += 1
+            pos.iloc[i] = 1
+            
+            # Check exit signal after min_hold
+            if exit_s == 1 and hold_days >= min_hold:
+                # Exit confirmed
+                in_position = False
+                hold_days = 0
+    
+    df['composite_signal'] = pos
     
     return df
 
-def enforce_min_hold(positions, min_hold=45):
+def enforce_min_hold(positions, min_hold=10):
     """
     Enforce minimum hold period of `min_hold` days.
     Once in position, must stay for at least min_hold days.
+    After min_hold, exit only if signal drops to 0 for 2+ consecutive days (confirmation).
     """
     pos = positions.copy()
     in_position = False
     hold_days = 0
+    exit_count = 0
     
     for i in range(len(pos)):
         if pos.iloc[i] == 1 and not in_position:
             # Entry
             in_position = True
             hold_days = 0
+            exit_count = 0
         elif pos.iloc[i] == 1 and in_position:
             # Still in position
             hold_days += 1
-            if hold_days < min_hold:
-                # Force stay in position even if signal says exit
-                pos.iloc[i] = 1
+            exit_count = 0
+            pos.iloc[i] = 1
         elif pos.iloc[i] == 0 and in_position:
             # Exit signal
             if hold_days < min_hold:
@@ -215,9 +260,17 @@ def enforce_min_hold(positions, min_hold=45):
                 pos.iloc[i] = 1
                 hold_days += 1
             else:
-                # Exit allowed
-                in_position = False
-                hold_days = 0
+                # After min_hold, require 5 consecutive exit signals
+                exit_count += 1
+                if exit_count >= 5:
+                    # Exit confirmed
+                    in_position = False
+                    hold_days = 0
+                    exit_count = 0
+                else:
+                    # Not confirmed yet, stay
+                    pos.iloc[i] = 1
+                    hold_days += 1
     return pos
 
 def compute_trade_list(df, prices, transaction_cost=0.001):
@@ -264,7 +317,7 @@ def compute_trade_list(df, prices, transaction_cost=0.001):
     
     return pd.DataFrame(trades)
 
-def compute_metrics(trades_df, df_prices=None):
+def compute_metrics(trades_df, positions=None, df_prices=None):
     """Compute summary statistics from trade list."""
     if trades_df.empty:
         return {'n_trades': 0, 'win_rate': 0, 'sharpe': 0, 'total_return': 0}
@@ -274,43 +327,24 @@ def compute_metrics(trades_df, df_prices=None):
     wins = (returns > 0).sum()
     win_rate = wins / n_trades * 100
     
-    # Sharpe calculation using daily returns from price series
-    if df_prices is not None and not trades_df.empty:
-        # Build equity curve from trade list
-        equity = pd.Series(1.0, index=df_prices.index)
-        in_position = False
-        entry_price = None
-        entry_idx = None
-        for i, (date, pos) in enumerate(df_prices.items()):
-            # Find if date is in trades_df entry or exit
-            entry_mask = trades_df['entry_date'] == date
-            exit_mask = trades_df['exit_date'] == date
-            if entry_mask.any():
-                in_position = True
-                entry_price = df_prices.loc[date]
-                entry_idx = i
-            elif exit_mask.any():
-                in_position = False
-                # compute return from entry to exit
-                exit_price = df_prices.loc[date]
-                # apply to equity from entry_idx to i
-                if entry_idx is not None:
-                    equity.iloc[entry_idx:i+1] = equity.iloc[entry_idx] * (exit_price / entry_price)
-        # Compute daily returns
-        daily_returns = equity.pct_change().fillna(0)
+    # Sharpe calculation using position series and daily returns
+    if positions is not None and df_prices is not None:
+        daily_returns = df_prices.pct_change().fillna(0)
+        strategy_returns = daily_returns * positions.shift(1).fillna(0)
         # Annualize
-        sharpe = daily_returns.mean() / daily_returns.std() * np.sqrt(365) if daily_returns.std() > 0 else 0
+        sharpe = strategy_returns.mean() / strategy_returns.std() * np.sqrt(365) if strategy_returns.std() > 0 else 0
+        # Total return from equity curve
+        equity = (1 + strategy_returns).cumprod()
+        total_return_pct = (equity.iloc[-1] - 1) * 100
     else:
-        # fallback approximation
         sharpe = returns.mean() / returns.std() * np.sqrt(365 / 60) if returns.std() > 0 else 0
-    
-    total_return = (1 + returns).prod() - 1
+        total_return_pct = ((1 + returns).prod() - 1) * 100
     
     return {
         'n_trades': n_trades,
         'win_rate': round(win_rate, 1),
         'sharpe': round(sharpe, 2),
-        'total_return': round(total_return * 100, 2)
+        'total_return': round(total_return_pct, 2)
     }
 
 if __name__ == "__main__":
@@ -325,14 +359,14 @@ if __name__ == "__main__":
     # Generate composite signal
     df = generate_composite_signal(df)
     
-    # Enforce minimum hold period
-    df['position'] = enforce_min_hold(df['composite_signal'], min_hold=45)
+    # Enforce minimum hold period with exit confirmation
+    df['position'] = enforce_min_hold(df['composite_signal'], min_hold=10)
     
     # Compute trade list
     trades_df = compute_trade_list(df, df['close'], transaction_cost=0.001)
     
     # Compute metrics
-    metrics = compute_metrics(trades_df, df_prices=df['close'])
+    metrics = compute_metrics(trades_df, positions=df['position'], df_prices=df['close'])
     
     print(f"\nPerformance Summary:")
     print(f"  Trades:      {metrics['n_trades']}")
