@@ -104,19 +104,14 @@ ax1.plot(df.index, df['close'], color='#4488ff', linewidth=0.8, alpha=0.7)
 # Entry markers
 entry_dates = [t['entry_date'] for t in trades]
 entry_prices = [t['entry_price'] for t in trades]
-ax1.scatter(entry_dates, entry_prices, marker='^', color='#22c55e', s=80, zorder=10,
-            edgecolors='#166534', linewidth=0.5, label=f'Entry ({len(trades)})')
+ax1.scatter(entry_dates, entry_prices, marker='^', color='#fbbf24', s=80, zorder=10,
+            edgecolors='#92400e', linewidth=0.5, label=f'Entry ({len(trades)})')
 
-# Exit markers (green=win, red=loss)
-win_dates = [t['exit_date'] for t in trades if t['is_win']]
-win_prices = [t['exit_price'] for t in trades if t['is_win']]
-loss_dates = [t['exit_date'] for t in trades if not t['is_win']]
-loss_prices = [t['exit_price'] for t in trades if not t['is_win']]
-
-ax1.scatter(win_dates, win_prices, marker='v', color='#22c55e', s=80, zorder=10,
-            edgecolors='#166534', linewidth=0.5, label=f'Win ({n_win})')
-ax1.scatter(loss_dates, loss_prices, marker='v', color='#ef4444', s=80, zorder=10,
-            edgecolors='#991b1b', linewidth=0.5, label=f'Loss ({n_loss})')
+# Exit markers (neutral — single color)
+exit_dates = [t['exit_date'] for t in trades]
+exit_prices = [t['exit_price'] for t in trades]
+ax1.scatter(exit_dates, exit_prices, marker='v', color='#ff6b6b', s=80, zorder=10,
+            edgecolors='#cc4444', linewidth=0.5, label=f'Exit ({len(trades)})')
 
 ax1.set_ylabel('BTC Price (USD)', fontsize=10, color='#888899')
 ax1.set_yscale('log')
