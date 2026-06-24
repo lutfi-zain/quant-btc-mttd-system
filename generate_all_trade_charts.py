@@ -1,0 +1,679 @@
+#!/usr/bin/env python3
+"""
+Generate Trade Charts for Each Indicator
+==========================================
+
+Creates individual trade visualization charts for each of the 4 indicators
+(MSVR, Ichimoku, Supertrend, Keltner), showing:
+- Price data with OHLC
+- Entry signals (green arrows)
+- Exit signals (red arrows)
+- Win/loss highlighting (green/red for profitable/losing trades)
+- Indicator behavior (support/resistance lines where applicable)
+
+Output: mttd/charts/{indicator}_trade_chart.png
+"""
+
+import os
+import sys
+import json
+import importlib.util
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.patches as mpatches
+import warnings
+warnings.filterwarnings('ignore')
+
+# Paths
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+BANK_ROOT = '/home/ubuntu/projects/quant-technical-indicator-bank'
+sys.path.append(PROJECT_ROOT)
+sys.path.append(BANK_ROOT)
+
+from indicators_helper import sma, ema, atr, linreg
+
+
+# ================================================================
+# Helper Functions (from holdout_best_configs.py)
+# ================================================================
+
+def ehler_supersmoother(series, length=7):
+    """Ehler's SuperSmoother Filter (Family 2: Filtering)."""
+    a1 = np.exp(-1.414 * np.pi / length)
+    b1 = 2 * a1 * np.cos(np.radians(1.414 * 180.0 / length))
+    c2 = b1
+    c3 = -a1 * a1
+    c1 = 1 - c2 - c3
+
+    vals = series.ffill().fillna(0).values
+    filt = np.zeros(len(vals))
+    filt[0] = vals[0]
+    if len(vals) > 1:
+        filt[1] = vals[1]
+    for i in range(2, len(vals)):
+        filt[i] = c1 * (vals[i] + vals[i-1]) / 2 + c2 * filt[i-1] + c3 * filt[i-2]
+    return pd.Series(filt, index=series.index)
+
+
+def compute_cycle_phase(df, lookback=40):
+    """FFT-based cycle phase timing (Family 4: Spectral)."""
+    src = (df['high'] + df['low'] + df['close']) / 3.0
+    n = len(df)
+    phase = pd.Series(np.nan, index=df.index)
+    min_period = 5
+    max_period = lookback // 2
+
+    for i in range(lookback - 1, n):
+        window = src.iloc[i - lookback + 1:i + 1].values
+        if np.any(np.isnan(window)):
+            continue
+        window_detrended = window - np.mean(window)
+        hann = np.hanning(lookback)
+        windowed = window_detrended * hann
+        fft_vals = np.fft.rfft(windowed)
+        power = np.abs(fft_vals) ** 2
+        freqs = np.fft.rfftfreq(lookback, d=1)
+        min_freq = 1.0 / max_period
+        max_freq = 1.0 / min_period
+        valid_mask = (freqs >= min_freq) & (freqs <= max_period)
+        valid_power = power[valid_mask]
+        valid_freqs = freqs[valid_mask]
+        if len(valid_power) > 0 and np.sum(valid_power) > 0:
+            dominant_idx = np.argmax(valid_power)
+            dominant_freq = valid_freqs[dominant_idx]
+            dominant_period = 1.0 / dominant_freq if dominant_freq > 0 else lookback
+            cycle_pos = i % int(dominant_period)
+            phase.iloc[i] = 2 * np.pi * cycle_pos / dominant_period
+    return phase
+
+
+# ================================================================
+# Signal Generators (from holdout_best_configs.py)
+# ================================================================
+
+def generate_keltner_signal(df, use_filters=False, min_hold=15, max_hold=60):
+    """Generate Keltner Channel trading signal."""
+    result = df.copy()
+    
+    # Keltner Channel computation
+    kc_mid = ema(result['close'], 20)
+    kc_atr = ema(result['high'] - result['low'], 20)
+    result['kc_upper'] = kc_mid + 1.5 * kc_atr
+    result['kc_lower'] = kc_mid - 1.5 * kc_atr
+    
+    # Base signals
+    result['kc_buy'] = (result['close'] > result['kc_upper']).astype(float)
+    result['kc_sell'] = (result['close'] < result['kc_lower']).astype(float)
+    
+    entry_signal = result['kc_buy']
+    exit_signal = result['kc_sell']
+    
+    # Apply filters if requested
+    if use_filters:
+        spec = importlib.util.spec_from_file_location(
+            'msvr',
+            os.path.join(BANK_ROOT, 'perpetual/median_standard_deviation_viresearch.py')
+        )
+        msvr_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(msvr_module)
+        msvr_result = msvr_module.median_standard_deviation_viresearch(result)
+        result['msvr_vii'] = msvr_result['vii']
+        
+        momentum = result['close'].pct_change(periods=10)
+        smooth = ehler_supersmoother(momentum, length=5)
+        result['smooth_direction'] = (smooth > 0).astype(float)
+        
+        phase = compute_cycle_phase(result, lookback=40)
+        cycle_signal = -np.cos(phase)
+        result['cycle_direction'] = (cycle_signal > 0).astype(float)
+        
+        result['msvr_direction'] = (result['msvr_vii'] > 0).astype(float)
+        
+        filter_pass = (result['msvr_direction'] * result['smooth_direction'] * result['cycle_direction']).astype(float)
+        entry_signal = result['kc_buy'] * filter_pass
+    
+    # Apply trade constraints
+    position = pd.Series(0.0, index=result.index)
+    in_position = False
+    hold_count = 0
+    
+    for i in range(len(result)):
+        if entry_signal.iloc[i] == 1.0 and not in_position:
+            in_position = True
+            hold_count = 0
+            position.iloc[i] = 1.0
+        elif in_position:
+            hold_count += 1
+            if hold_count >= min_hold and exit_signal.iloc[i] == 1.0:
+                in_position = False
+                hold_count = 0
+                position.iloc[i] = 0.0
+            elif hold_count >= max_hold:
+                in_position = False
+                hold_count = 0
+                position.iloc[i] = 0.0
+            else:
+                position.iloc[i] = 1.0
+        else:
+            position.iloc[i] = 0.0
+    
+    return position, result
+
+
+def generate_ichimoku_signal(df, min_hold=15, max_hold=60):
+    """Generate Ichimoku trading signal."""
+    sys.path.insert(0, PROJECT_ROOT)
+    from ichimoku_quant import generate_ichimoku_features, generate_ichimoku_signals
+    
+    df_ich = generate_ichimoku_features(df.copy())
+    df_ich = generate_ichimoku_signals(
+        df_ich,
+        confirm_entry=2,
+        confirm_exit=1,
+        min_hold_days=min_hold,
+        er_entry=0.25,
+        t_entry=0.40,
+        chikou_thresh=-0.30,
+        immunity_thresh=0.50,
+        entropy_thresh=2.271,
+        imo_min_limit=-0.30,
+        imo_exit_bull=-0.30,
+        roc_gate_limit=-0.20
+    )
+    
+    position = df_ich['Pos'].copy()
+    
+    # Enforce max_hold constraint
+    in_position = False
+    hold_count = 0
+    
+    for i in range(len(position)):
+        if position.iloc[i] == 1.0 and not in_position:
+            in_position = True
+            hold_count = 0
+        elif in_position:
+            hold_count += 1
+            if hold_count >= max_hold:
+                position.iloc[i] = 0.0
+                in_position = False
+                hold_count = 0
+        else:
+            hold_count = 0
+    
+    return position, df_ich
+
+
+def generate_supertrend_signal(df, min_hold=15, max_hold=90):
+    """Generate Supertrend trading signal."""
+    spec_st = importlib.util.spec_from_file_location(
+        'supertrend',
+        os.path.join(BANK_ROOT, 'perpetual/median_supertrend_viresearch.py')
+    )
+    st_module = importlib.util.module_from_spec(spec_st)
+    spec_st.loader.exec_module(st_module)
+    st_result = st_module.median_supertrend_viresearch(df)
+    
+    st_vii = st_result['vii']
+    st_buy = (st_vii > 0).astype(float)
+    st_sell = (st_vii < 0).astype(float)
+    
+    position = pd.Series(0.0, index=df.index)
+    in_position = False
+    hold_count = 0
+    
+    for i in range(len(df)):
+        if st_buy.iloc[i] == 1.0 and not in_position:
+            in_position = True
+            hold_count = 0
+            position.iloc[i] = 1.0
+        elif in_position:
+            hold_count += 1
+            if hold_count >= min_hold and st_sell.iloc[i] == 1.0:
+                in_position = False
+                hold_count = 0
+                position.iloc[i] = 0.0
+            elif hold_count >= max_hold:
+                in_position = False
+                hold_count = 0
+                position.iloc[i] = 0.0
+            else:
+                position.iloc[i] = 1.0
+        else:
+            position.iloc[i] = 0.0
+    
+    return position, st_result
+
+
+def generate_msvr_signal(df, min_hold=15, max_hold=90):
+    """Generate MSVR trading signal."""
+    spec = importlib.util.spec_from_file_location(
+        'msvr',
+        os.path.join(BANK_ROOT, 'perpetual/median_standard_deviation_viresearch.py')
+    )
+    msvr_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(msvr_module)
+    msvr_result = msvr_module.median_standard_deviation_viresearch(df)
+    
+    msvr_vii = msvr_result['vii']
+    msvr_buy = (msvr_vii > 0).astype(float)
+    msvr_sell = (msvr_vii < 0).astype(float)
+    
+    position = pd.Series(0.0, index=df.index)
+    in_position = False
+    hold_count = 0
+    
+    for i in range(len(df)):
+        if msvr_buy.iloc[i] == 1.0 and not in_position:
+            in_position = True
+            hold_count = 0
+            position.iloc[i] = 1.0
+        elif in_position:
+            hold_count += 1
+            if hold_count >= min_hold and msvr_sell.iloc[i] == 1.0:
+                in_position = False
+                hold_count = 0
+                position.iloc[i] = 0.0
+            elif hold_count >= max_hold:
+                in_position = False
+                hold_count = 0
+                position.iloc[i] = 0.0
+            else:
+                position.iloc[i] = 1.0
+        else:
+            position.iloc[i] = 0.0
+    
+    return position, msvr_result
+
+
+# ================================================================
+# Trade Extraction
+# ================================================================
+
+def extract_trades(position, prices):
+    """
+    Extract individual trades from position series.
+    
+    Returns list of dicts:
+    [
+        {
+            'entry_date': pd.Timestamp,
+            'exit_date': pd.Timestamp,
+            'entry_price': float,
+            'exit_price': float,
+            'return_pct': float,
+            'hold_days': int,
+            'is_win': bool
+        },
+        ...
+    ]
+    """
+    trades = []
+    in_position = False
+    entry_date = None
+    entry_price = None
+    
+    for i, (date, pos) in enumerate(position.items()):
+        if pos == 1.0 and not in_position:
+            in_position = True
+            entry_date = date
+            entry_price = prices.loc[date]
+        elif pos == 0.0 and in_position:
+            in_position = False
+            exit_price = prices.loc[date]
+            return_pct = (exit_price - entry_price) / entry_price * 100
+            hold_days = (date - entry_date).days
+            
+            trades.append({
+                'entry_date': entry_date,
+                'exit_date': date,
+                'entry_price': entry_price,
+                'exit_price': exit_price,
+                'return_pct': return_pct,
+                'hold_days': hold_days,
+                'is_win': return_pct > 0
+            })
+    
+    return trades
+
+
+def compute_trade_metrics(trades):
+    """Compute summary metrics for a list of trades."""
+    if len(trades) == 0:
+        return {
+            'n_trades': 0,
+            'win_rate': 0,
+            'avg_return': 0,
+            'total_return': 0,
+            'sharpe': 0,
+            'avg_hold': 0
+        }
+    
+    returns = [t['return_pct'] for t in trades]
+    wins = sum(1 for t in trades if t['is_win'])
+    n_trades = len(trades)
+    win_rate = wins / n_trades * 100
+    avg_return = np.mean(returns)
+    total_return = np.sum(returns)
+    avg_hold = np.mean([t['hold_days'] for t in trades])
+    
+    # Sharpe-like ratio (annualized)
+    if np.std(returns) > 0:
+        sharpe = np.mean(returns) / np.std(returns) * np.sqrt(n_trades / 365 * 365)
+    else:
+        sharpe = 0
+    
+    return {
+        'n_trades': n_trades,
+        'win_rate': win_rate,
+        'avg_return': avg_return,
+        'total_return': total_return,
+        'sharpe': sharpe,
+        'avg_hold': avg_hold
+    }
+
+
+# ================================================================
+# Chart Generation
+# ================================================================
+
+def generate_trade_chart(df, position, indicator_data, trades, indicator_name,
+                         output_dir, extra_info=None):
+    """
+    Generate a trade visualization chart for an indicator.
+    
+    Args:
+        df: DataFrame with OHLCV data
+        position: Series with position signals (1=long, 0=flat)
+        indicator_data: Dict or DataFrame with indicator-specific data (e.g., Keltner channels)
+        trades: List of trade dicts from extract_trades()
+        indicator_name: String name for the chart title
+        output_dir: Directory to save the chart
+        extra_info: Optional dict with additional info for the title
+    """
+    # Set style
+    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.rcParams['figure.facecolor'] = 'white'
+    plt.rcParams['axes.facecolor'] = '#f8f9fa'
+    
+    # Create figure with 2 subplots (price + trades)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 12), 
+                                     gridspec_kw={'height_ratios': [3, 1]},
+                                     sharex=True)
+    
+    # Compute metrics
+    metrics = compute_trade_metrics(trades)
+    
+    # Build title
+    title = f"{indicator_name} Trade Chart"
+    if extra_info:
+        title += f"\n{extra_info}"
+    title += f"\nTrades: {metrics['n_trades']} | Win Rate: {metrics['win_rate']:.1f}% | Avg Return: {metrics['avg_return']:.2f}% | Avg Hold: {metrics['avg_hold']:.0f}d"
+    ax1.set_title(title, fontsize=14, fontweight='bold', pad=15)
+    
+    # Plot price data
+    ax1.plot(df.index, df['close'], color='#2196F3', linewidth=1.2, label='BTC Close', alpha=0.8)
+    
+    # Add indicator-specific overlays
+    if indicator_name == 'Keltner' and isinstance(indicator_data, pd.DataFrame):
+        # Plot Keltner channels
+        if 'kc_upper' in indicator_data.columns:
+            ax1.plot(indicator_data.index, indicator_data['kc_upper'], 
+                     color='orange', linewidth=0.8, alpha=0.6, label='KC Upper')
+            ax1.plot(indicator_data.index, indicator_data['kc_lower'], 
+                     color='orange', linewidth=0.8, alpha=0.6, label='KC Lower')
+            ax1.fill_between(indicator_data.index, 
+                           indicator_data['kc_lower'], indicator_data['kc_upper'],
+                           color='orange', alpha=0.1)
+    elif indicator_name == 'Ichimoku' and isinstance(indicator_data, pd.DataFrame):
+        # Plot Ichimoku cloud
+        if 'senkou_span_a' in indicator_data.columns and 'senkou_span_b' in indicator_data.columns:
+            cloud_a = indicator_data['senkou_span_a'].shift(60)
+            cloud_b = indicator_data['senkou_span_b'].shift(60)
+            ax1.fill_between(indicator_data.index, cloud_a, cloud_b,
+                           where=cloud_a >= cloud_b, color='green', alpha=0.15, label='Bullish Cloud')
+            ax1.fill_between(indicator_data.index, cloud_a, cloud_b,
+                           where=cloud_a < cloud_b, color='red', alpha=0.15, label='Bearish Cloud')
+            ax1.plot(indicator_data.index, cloud_a, color='green', linewidth=0.6, alpha=0.5)
+            ax1.plot(indicator_data.index, cloud_b, color='red', linewidth=0.6, alpha=0.5)
+        if 'tenkan_sen' in indicator_data.columns:
+            ax1.plot(indicator_data.index, indicator_data['tenkan_sen'], 
+                     color='blue', linewidth=0.6, alpha=0.5, label='Tenkan')
+        if 'kijun_sen' in indicator_data.columns:
+            ax1.plot(indicator_data.index, indicator_data['kijun_sen'], 
+                     color='red', linewidth=0.6, alpha=0.5, label='Kijun')
+    elif indicator_name == 'Supertrend' and isinstance(indicator_data, pd.DataFrame):
+        # Plot Supertrend line
+        if 'st' in indicator_data.columns:
+            st_values = indicator_data['st']
+            # Color by trend direction
+            colors = np.where(indicator_data['vii'] > 0, 'green', 'red')
+            ax1.plot(indicator_data.index, st_values, color='purple', 
+                     linewidth=1.0, alpha=0.7, label='Supertrend')
+    elif indicator_name == 'MSVR' and isinstance(indicator_data, pd.DataFrame):
+        # Plot MSVR median band
+        if 'median' in indicator_data.columns:
+            ax1.plot(indicator_data.index, indicator_data['median'], 
+                     color='purple', linewidth=0.8, alpha=0.6, label='Median')
+        if 'upper' in indicator_data.columns and 'lower' in indicator_data.columns:
+            ax1.plot(indicator_data.index, indicator_data['upper'], 
+                     color='green', linewidth=0.6, alpha=0.4, label='Upper Band')
+            ax1.plot(indicator_data.index, indicator_data['lower'], 
+                     color='red', linewidth=0.6, alpha=0.4, label='Lower Band')
+            ax1.fill_between(indicator_data.index, 
+                           indicator_data['lower'], indicator_data['upper'],
+                           color='purple', alpha=0.1)
+    
+    # Mark entry/exit points with color based on win/loss
+    for trade in trades:
+        # Entry marker
+        ax1.scatter(trade['entry_date'], trade['entry_price'], 
+                   marker='^', color='#4CAF50', s=120, zorder=5, edgecolors='black', linewidth=0.5)
+        
+        # Exit marker (colored by win/loss)
+        exit_color = '#4CAF50' if trade['is_win'] else '#F44336'
+        ax1.scatter(trade['exit_date'], trade['exit_price'],
+                   marker='v', color=exit_color, s=120, zorder=5, edgecolors='black', linewidth=0.5)
+        
+        # Connect entry/exit with line (colored by win/loss)
+        line_color = '#4CAF50' if trade['is_win'] else '#F44336'
+        ax1.plot([trade['entry_date'], trade['exit_date']], 
+                [trade['entry_price'], trade['exit_price']],
+                color=line_color, linewidth=1.5, alpha=0.5, linestyle='--')
+        
+        # Shade winning trades green, losing trades red
+        if trade['is_win']:
+            ax1.axvspan(trade['entry_date'], trade['exit_date'], 
+                       alpha=0.08, color='green')
+        else:
+            ax1.axvspan(trade['entry_date'], trade['exit_date'], 
+                       alpha=0.08, color='red')
+    
+    ax1.set_ylabel('BTC Price (USD)', fontsize=11)
+    ax1.legend(loc='upper left', fontsize=9, ncol=2)
+    ax1.set_yscale('log')
+    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+    ax1.grid(True, alpha=0.3)
+    
+    # Add holdout boundary
+    holdout_date = pd.Timestamp('2025-01-01')
+    ax1.axvline(x=holdout_date, color='red', linestyle='--', linewidth=1.5, alpha=0.7)
+    ax1.text(holdout_date, ax1.get_ylim()[1]*0.95, '← Training | Holdout →', 
+             ha='center', fontsize=9, color='red', fontweight='bold',
+             bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='red', alpha=0.8))
+    
+    # Bottom panel: Trade returns bar chart
+    trade_dates = [t['exit_date'] for t in trades]
+    trade_returns = [t['return_pct'] for t in trades]
+    trade_colors = ['#4CAF50' if r > 0 else '#F44336' for r in trade_returns]
+    
+    bars = ax2.bar(trade_dates, trade_returns, color=trade_colors, alpha=0.7, width=15)
+    ax2.axhline(y=0, color='black', linewidth=0.5)
+    ax2.set_ylabel('Trade Return (%)', fontsize=11)
+    ax2.set_xlabel('Date', fontsize=11)
+    ax2.grid(True, alpha=0.3)
+    
+    # Add value labels on bars
+    for bar, ret_val in zip(bars, trade_returns):
+        height = bar.get_height()
+        ax2.text(bar.get_x() + bar.get_width()/2., height,
+                f'{ret_val:.1f}%', ha='center', va='bottom' if height > 0 else 'top',
+                fontsize=7, fontweight='bold')
+    
+    # Format x-axis
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
+    plt.xticks(rotation=45)
+    
+    # Add legend
+    win_patch = mpatches.Patch(color='#4CAF50', label=f'Winning Trades ({sum(1 for t in trades if t["is_win"])})')
+    loss_patch = mpatches.Patch(color='#F44336', label=f'Losing Trades ({sum(1 for t in trades if not t["is_win"])})')
+    ax2.legend(handles=[win_patch, loss_patch], loc='upper right', fontsize=9)
+    
+    plt.tight_layout()
+    
+    # Save chart
+    chart_filename = f"{indicator_name.lower()}_trade_chart.png"
+    chart_path = os.path.join(output_dir, chart_filename)
+    plt.savefig(chart_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    return chart_path
+
+
+# ================================================================
+# Main
+# ================================================================
+
+def main():
+    print("=" * 70)
+    print("GENERATING TRADE CHARTS FOR ALL INDICATORS")
+    print("=" * 70)
+    print()
+    
+    # ================================================================
+    # Step 1: Load BTC Data
+    # ================================================================
+    print("[1/6] Loading BTC data...")
+    
+    with open(os.path.join(PROJECT_ROOT, 'data', 'btc_daily.json')) as f:
+        btc_data = json.load(f)
+    
+    df = pd.DataFrame(btc_data['aligned_data'])
+    df['time'] = pd.to_datetime(df['time'])
+    df = df.set_index('time')
+    df = df[df.index >= '2018-01-01']
+    
+    print(f"  Total data: {len(df)} bars ({df.index[0].date()} to {df.index[-1].date()})")
+    
+    # ================================================================
+    # Step 2: Create output directory
+    # ================================================================
+    print("\n[2/6] Creating output directory...")
+    
+    output_dir = os.path.join(PROJECT_ROOT, 'mttd', 'charts')
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"  Output: {output_dir}")
+    
+    # ================================================================
+    # Step 3: Generate MSVR trades and chart
+    # ================================================================
+    print("\n[3/6] Generating MSVR trade chart...")
+    
+    position_msvr, msvr_data = generate_msvr_signal(df, min_hold=15, max_hold=90)
+    trades_msvr = extract_trades(position_msvr, df['close'])
+    metrics_msvr = compute_trade_metrics(trades_msvr)
+    
+    chart_path = generate_trade_chart(
+        df, position_msvr, msvr_data, trades_msvr, 'MSVR',
+        output_dir,
+        extra_info='MH=15/90 | Median Standard Deviation'
+    )
+    print(f"  Trades: {metrics_msvr['n_trades']}, Win Rate: {metrics_msvr['win_rate']:.1f}%")
+    print(f"  Saved: {chart_path}")
+    
+    # ================================================================
+    # Step 4: Generate Ichimoku trades and chart
+    # ================================================================
+    print("\n[4/6] Generating Ichimoku trade chart...")
+    
+    position_ichimoku, ichimoku_data = generate_ichimoku_signal(df, min_hold=15, max_hold=60)
+    trades_ichimoku = extract_trades(position_ichimoku, df['close'])
+    metrics_ichimoku = compute_trade_metrics(trades_ichimoku)
+    
+    chart_path = generate_trade_chart(
+        df, position_ichimoku, ichimoku_data, trades_ichimoku, 'Ichimoku',
+        output_dir,
+        extra_info='MH=15/60 | Ichimoku Momentum Oscillator'
+    )
+    print(f"  Trades: {metrics_ichimoku['n_trades']}, Win Rate: {metrics_ichimoku['win_rate']:.1f}%")
+    print(f"  Saved: {chart_path}")
+    
+    # ================================================================
+    # Step 5: Generate Supertrend trades and chart
+    # ================================================================
+    print("\n[5/6] Generating Supertrend trade chart...")
+    
+    position_supertrend, supertrend_data = generate_supertrend_signal(df, min_hold=15, max_hold=90)
+    trades_supertrend = extract_trades(position_supertrend, df['close'])
+    metrics_supertrend = compute_trade_metrics(trades_supertrend)
+    
+    chart_path = generate_trade_chart(
+        df, position_supertrend, supertrend_data, trades_supertrend, 'Supertrend',
+        output_dir,
+        extra_info='MH=15/90 | Median Supertrend'
+    )
+    print(f"  Trades: {metrics_supertrend['n_trades']}, Win Rate: {metrics_supertrend['win_rate']:.1f}%")
+    print(f"  Saved: {chart_path}")
+    
+    # ================================================================
+    # Step 6: Generate Keltner trades and chart
+    # ================================================================
+    print("\n[6/6] Generating Keltner trade chart...")
+    
+    position_keltner, keltner_data = generate_keltner_signal(
+        df, use_filters=True, min_hold=15, max_hold=60
+    )
+    trades_keltner = extract_trades(position_keltner, df['close'])
+    metrics_keltner = compute_trade_metrics(trades_keltner)
+    
+    chart_path = generate_trade_chart(
+        df, position_keltner, keltner_data, trades_keltner, 'Keltner',
+        output_dir,
+        extra_info='MH=15/60 | Bull With Filters (MSVR/Smooth/Cycle)'
+    )
+    print(f"  Trades: {metrics_keltner['n_trades']}, Win Rate: {metrics_keltner['win_rate']:.1f}%")
+    print(f"  Saved: {chart_path}")
+    
+    # ================================================================
+    # Summary
+    # ================================================================
+    print("\n" + "=" * 70)
+    print("TRADE CHARTS GENERATED SUCCESSFULLY")
+    print("=" * 70)
+    
+    print("\nChart Files:")
+    for filename in ['msvr_trade_chart.png', 'ichimoku_trade_chart.png', 
+                     'supertrend_trade_chart.png', 'keltner_trade_chart.png']:
+        filepath = os.path.join(output_dir, filename)
+        if os.path.exists(filepath):
+            print(f"  ✅ {filename}")
+        else:
+            print(f"  ❌ {filename} (NOT FOUND)")
+    
+    print("\nTrade Summary:")
+    print(f"  {'Indicator':<15} {'Trades':>8} {'Win%':>8} {'Avg Ret':>10} {'Avg Hold':>10}")
+    print("  " + "-" * 60)
+    print(f"  {'MSVR':<15} {metrics_msvr['n_trades']:>8} {metrics_msvr['win_rate']:>7.1f}% {metrics_msvr['avg_return']:>9.2f}% {metrics_msvr['avg_hold']:>8.0f}d")
+    print(f"  {'Ichimoku':<15} {metrics_ichimoku['n_trades']:>8} {metrics_ichimoku['win_rate']:>7.1f}% {metrics_ichimoku['avg_return']:>9.2f}% {metrics_ichimoku['avg_hold']:>8.0f}d")
+    print(f"  {'Supertrend':<15} {metrics_supertrend['n_trades']:>8} {metrics_supertrend['win_rate']:>7.1f}% {metrics_supertrend['avg_return']:>9.2f}% {metrics_supertrend['avg_hold']:>8.0f}d")
+    print(f"  {'Keltner':<15} {metrics_keltner['n_trades']:>8} {metrics_keltner['win_rate']:>7.1f}% {metrics_keltner['avg_return']:>9.2f}% {metrics_keltner['avg_hold']:>8.0f}d")
+    
+    print("\n" + "=" * 70)
+    print("ALL DONE")
+    print("=" * 70)
+
+
+if __name__ == "__main__":
+    main()
