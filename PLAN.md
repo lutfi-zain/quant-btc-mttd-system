@@ -84,21 +84,24 @@ Add NEW statistical families not yet used.
 
 ## Phase 2 Results ✅ COMPLETED
 
+### MSVR v6 (Best Config)
 | Metric | Target | Achieved | Status |
 |--------|--------|----------|--------|
-| Trades | < 15 | 15 | ✅ |
-| Win Rate | > 65% | 66.7% | ✅ |
-| Sharpe | > 1.35 | 1.12 | ❌ |
-| CAGR | > 60% | 39.5% | ❌ |
+| Trades | < 15 | 8 | ✅ |
+| Win Rate | > 65% | 75.0% | ✅ |
+| Sharpe | > 1.35 | 0.73 | ❌ |
+| CAGR | > 60% | 19.9% | ❌ |
+| Avg Hold | > 60d | 96d | ✅ |
 
-**Key Finding:** All 9 families integrated, but Sharpe capped at 1.12
-**Root Cause:** min_hold=45 forces holding losing trades, reducing Sharpe
+**Key Finding:** MSVR v6 achieves 75% win rate (beats Ichimoku's 63.6%!)
+**Trade-off:** Higher quality (75% win) but lower returns (19.9% CAGR)
+**Root Cause:** Only in market 25% of time vs Ichimoku's 45%
 
 ## Timeline
 
 | Phase | Duration | Deliverable | Status |
 |-------|----------|-------------|--------|
 | Phase 1 | 1 session | MSVR+Ichimoku hybrid | ✅ DONE |
-| Phase 2 | 1 session | MSVR v3 with new principles | ✅ DONE |
+| Phase 2 | 1 session | MSVR v6 with 10 families | ✅ DONE |
 | Phase 3 | 1 session | Validated system | 🔄 NEXT |
 | **Total** | **3 sessions** | **Final system** | |
