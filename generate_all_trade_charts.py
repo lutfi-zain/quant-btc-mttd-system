@@ -93,197 +93,156 @@ def compute_cycle_phase(df, lookback=40):
 # Signal Generators (from holdout_best_configs.py)
 # ================================================================
 
-def generate_keltner_signal(df, use_filters=False, min_hold=15, max_hold=60):
+def apply_position_state_machine(entry_signal, exit_signal, min_hold, max_hold, cooldown=5):
+    """
+    Clean state machine: entry → hold → exit → cooldown → entry → ...
+    
+    Prevents immediate re-entry after exit (cooldown period).
+    """
+    position = pd.Series(0.0, index=entry_signal.index)
+    in_position = False
+    hold_count = 0
+    cooldown_count = 0
+
+    for i in range(len(entry_signal)):
+        if cooldown_count > 0:
+            cooldown_count -= 1
+
+        if entry_signal.iloc[i] == 1.0 and not in_position and cooldown_count == 0:
+            # ENTRY — only if not in position AND cooldown done
+            in_position = True
+            hold_count = 0
+            position.iloc[i] = 1.0
+        elif in_position:
+            hold_count += 1
+            if (hold_count >= min_hold and exit_signal.iloc[i] == 1.0) or hold_count >= max_hold:
+                # EXIT — min_hold + exit signal, OR max_hold forced
+                in_position = False
+                hold_count = 0
+                cooldown_count = cooldown
+                position.iloc[i] = 0.0
+            else:
+                position.iloc[i] = 1.0
+        else:
+            position.iloc[i] = 0.0
+
+    return position
+
+
+def generate_keltner_signal(df, use_filters=False, min_hold=15, max_hold=60, cooldown=5):
     """Generate Keltner Channel trading signal."""
     result = df.copy()
-    
-    # Keltner Channel computation
     kc_mid = ema(result['close'], 20)
     kc_atr = ema(result['high'] - result['low'], 20)
     result['kc_upper'] = kc_mid + 1.5 * kc_atr
     result['kc_lower'] = kc_mid - 1.5 * kc_atr
-    
-    # Base signals
+
     result['kc_buy'] = (result['close'] > result['kc_upper']).astype(float)
     result['kc_sell'] = (result['close'] < result['kc_lower']).astype(float)
-    
+
     entry_signal = result['kc_buy']
     exit_signal = result['kc_sell']
-    
-    # Apply filters if requested
+
     if use_filters:
         spec = importlib.util.spec_from_file_location(
-            'msvr',
-            os.path.join(BANK_ROOT, 'perpetual/median_standard_deviation_viresearch.py')
+            'msvr', BANK_ROOT + '/perpetual/median_standard_deviation_viresearch.py'
         )
         msvr_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(msvr_module)
         msvr_result = msvr_module.median_standard_deviation_viresearch(result)
         result['msvr_vii'] = msvr_result['vii']
-        
+
         momentum = result['close'].pct_change(periods=10)
         smooth = ehler_supersmoother(momentum, length=5)
         result['smooth_direction'] = (smooth > 0).astype(float)
-        
         phase = compute_cycle_phase(result, lookback=40)
         cycle_signal = -np.cos(phase)
         result['cycle_direction'] = (cycle_signal > 0).astype(float)
-        
         result['msvr_direction'] = (result['msvr_vii'] > 0).astype(float)
-        
+
         filter_pass = (result['msvr_direction'] * result['smooth_direction'] * result['cycle_direction']).astype(float)
         entry_signal = result['kc_buy'] * filter_pass
-    
-    # Apply trade constraints
-    position = pd.Series(0.0, index=result.index)
+
+    position = apply_position_state_machine(entry_signal, exit_signal, min_hold, max_hold, cooldown)
+    return position, result
+
+
+def generate_ichimoku_signal(df, min_hold=15, max_hold=60, cooldown=5):
+    """Generate Ichimoku trading signal with cooldown."""
+    sys.path.insert(0, PROJECT_ROOT)
+    from ichimoku_quant import generate_ichimoku_features, generate_ichimoku_signals
+
+    df_ich = generate_ichimoku_features(df.copy())
+    df_ich = generate_ichimoku_signals(
+        df_ich,
+        confirm_entry=2, confirm_exit=1, min_hold_days=min_hold,
+        er_entry=0.25, t_entry=0.40, chikou_thresh=-0.30,
+        immunity_thresh=0.50, entropy_thresh=2.271,
+        imo_min_limit=-0.30, imo_exit_bull=-0.30, roc_gate_limit=-0.20
+    )
+
+    raw_pos = df_ich['Pos'].copy()
+
+    # Apply max_hold + cooldown on top of Ichimoku's position
     in_position = False
     hold_count = 0
-    
-    for i in range(len(result)):
-        if entry_signal.iloc[i] == 1.0 and not in_position:
+    cooldown_count = 0
+    position = pd.Series(0.0, index=raw_pos.index)
+
+    for i in range(len(raw_pos)):
+        if cooldown_count > 0:
+            cooldown_count -= 1
+
+        if raw_pos.iloc[i] == 1.0 and not in_position and cooldown_count == 0:
             in_position = True
             hold_count = 0
             position.iloc[i] = 1.0
         elif in_position:
             hold_count += 1
-            if hold_count >= min_hold and exit_signal.iloc[i] == 1.0:
+            if hold_count >= max_hold or (hold_count >= min_hold and raw_pos.iloc[i] == 0.0):
                 in_position = False
                 hold_count = 0
-                position.iloc[i] = 0.0
-            elif hold_count >= max_hold:
-                in_position = False
-                hold_count = 0
+                cooldown_count = cooldown
                 position.iloc[i] = 0.0
             else:
                 position.iloc[i] = 1.0
         else:
             position.iloc[i] = 0.0
-    
-    return position, result
 
-
-def generate_ichimoku_signal(df, min_hold=15, max_hold=60):
-    """Generate Ichimoku trading signal."""
-    sys.path.insert(0, PROJECT_ROOT)
-    from ichimoku_quant import generate_ichimoku_features, generate_ichimoku_signals
-    
-    df_ich = generate_ichimoku_features(df.copy())
-    df_ich = generate_ichimoku_signals(
-        df_ich,
-        confirm_entry=2,
-        confirm_exit=1,
-        min_hold_days=min_hold,
-        er_entry=0.25,
-        t_entry=0.40,
-        chikou_thresh=-0.30,
-        immunity_thresh=0.50,
-        entropy_thresh=2.271,
-        imo_min_limit=-0.30,
-        imo_exit_bull=-0.30,
-        roc_gate_limit=-0.20
-    )
-    
-    position = df_ich['Pos'].copy()
-    
-    # Enforce max_hold constraint
-    in_position = False
-    hold_count = 0
-    
-    for i in range(len(position)):
-        if position.iloc[i] == 1.0 and not in_position:
-            in_position = True
-            hold_count = 0
-        elif in_position:
-            hold_count += 1
-            if hold_count >= max_hold:
-                position.iloc[i] = 0.0
-                in_position = False
-                hold_count = 0
-        else:
-            hold_count = 0
-    
     return position, df_ich
 
 
-def generate_supertrend_signal(df, min_hold=15, max_hold=90):
-    """Generate Supertrend trading signal."""
+def generate_supertrend_signal(df, min_hold=15, max_hold=90, cooldown=5):
+    """Generate Supertrend trading signal with cooldown."""
     spec_st = importlib.util.spec_from_file_location(
-        'supertrend',
-        os.path.join(BANK_ROOT, 'perpetual/median_supertrend_viresearch.py')
+        'supertrend', BANK_ROOT + '/perpetual/median_supertrend_viresearch.py'
     )
     st_module = importlib.util.module_from_spec(spec_st)
     spec_st.loader.exec_module(st_module)
     st_result = st_module.median_supertrend_viresearch(df)
-    
+
     st_vii = st_result['vii']
-    st_buy = (st_vii > 0).astype(float)
-    st_sell = (st_vii < 0).astype(float)
-    
-    position = pd.Series(0.0, index=df.index)
-    in_position = False
-    hold_count = 0
-    
-    for i in range(len(df)):
-        if st_buy.iloc[i] == 1.0 and not in_position:
-            in_position = True
-            hold_count = 0
-            position.iloc[i] = 1.0
-        elif in_position:
-            hold_count += 1
-            if hold_count >= min_hold and st_sell.iloc[i] == 1.0:
-                in_position = False
-                hold_count = 0
-                position.iloc[i] = 0.0
-            elif hold_count >= max_hold:
-                in_position = False
-                hold_count = 0
-                position.iloc[i] = 0.0
-            else:
-                position.iloc[i] = 1.0
-        else:
-            position.iloc[i] = 0.0
-    
+    entry_signal = (st_vii > 0).astype(float)
+    exit_signal = (st_vii < 0).astype(float)
+
+    position = apply_position_state_machine(entry_signal, exit_signal, min_hold, max_hold, cooldown)
     return position, st_result
 
 
-def generate_msvr_signal(df, min_hold=15, max_hold=90):
-    """Generate MSVR trading signal."""
+def generate_msvr_signal(df, min_hold=15, max_hold=90, cooldown=5):
+    """Generate MSVR trading signal with cooldown."""
     spec = importlib.util.spec_from_file_location(
-        'msvr',
-        os.path.join(BANK_ROOT, 'perpetual/median_standard_deviation_viresearch.py')
+        'msvr', BANK_ROOT + '/perpetual/median_standard_deviation_viresearch.py'
     )
     msvr_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(msvr_module)
     msvr_result = msvr_module.median_standard_deviation_viresearch(df)
-    
+
     msvr_vii = msvr_result['vii']
-    msvr_buy = (msvr_vii > 0).astype(float)
-    msvr_sell = (msvr_vii < 0).astype(float)
-    
-    position = pd.Series(0.0, index=df.index)
-    in_position = False
-    hold_count = 0
-    
-    for i in range(len(df)):
-        if msvr_buy.iloc[i] == 1.0 and not in_position:
-            in_position = True
-            hold_count = 0
-            position.iloc[i] = 1.0
-        elif in_position:
-            hold_count += 1
-            if hold_count >= min_hold and msvr_sell.iloc[i] == 1.0:
-                in_position = False
-                hold_count = 0
-                position.iloc[i] = 0.0
-            elif hold_count >= max_hold:
-                in_position = False
-                hold_count = 0
-                position.iloc[i] = 0.0
-            else:
-                position.iloc[i] = 1.0
-        else:
-            position.iloc[i] = 0.0
-    
+    entry_signal = (msvr_vii > 0).astype(float)
+    exit_signal = (msvr_vii < 0).astype(float)
+
+    position = apply_position_state_machine(entry_signal, exit_signal, min_hold, max_hold, cooldown)
     return position, msvr_result
 
 
@@ -383,155 +342,92 @@ def generate_trade_chart(df, position, indicator_data, trades, indicator_name,
     """
     Generate a trade visualization chart for an indicator.
     
-    Args:
-        df: DataFrame with OHLCV data
-        position: Series with position signals (1=long, 0=flat)
-        indicator_data: Dict or DataFrame with indicator-specific data (e.g., Keltner channels)
-        trades: List of trade dicts from extract_trades()
-        indicator_name: String name for the chart title
-        output_dir: Directory to save the chart
-        extra_info: Optional dict with additional info for the title
+    CLEAN version: only entry/exit arrows, no connecting lines, no shaded areas.
     """
-    # Set style
-    plt.style.use('seaborn-v0_8-darkgrid')
-    plt.rcParams['figure.facecolor'] = 'white'
-    plt.rcParams['axes.facecolor'] = '#f8f9fa'
+    # Use minimal style
+    plt.rcParams.update({
+        'figure.facecolor': 'white',
+        'axes.facecolor': 'white',
+        'axes.edgecolor': '#cccccc',
+        'axes.grid': True,
+        'grid.alpha': 0.2,
+        'grid.color': '#cccccc',
+    })
     
-    # Create figure with 2 subplots (price + trades)
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 12), 
+    # Create figure with 2 subplots (price + returns)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 10),
                                      gridspec_kw={'height_ratios': [3, 1]},
                                      sharex=True)
     
     # Compute metrics
     metrics = compute_trade_metrics(trades)
+    n_win = sum(1 for t in trades if t['is_win'])
+    n_loss = len(trades) - n_win
     
     # Build title
-    title = f"{indicator_name} Trade Chart"
+    title = f"{indicator_name} | {metrics['n_trades']} trades | {metrics['win_rate']:.0f}% win | Sharpe {metrics['sharpe']:.2f} | CAGR {metrics['total_return']/len(df)*365:.0f}%"
     if extra_info:
-        title += f"\n{extra_info}"
-    title += f"\nTrades: {metrics['n_trades']} | Win Rate: {metrics['win_rate']:.1f}% | Avg Return: {metrics['avg_return']:.2f}% | Avg Hold: {metrics['avg_hold']:.0f}d"
-    ax1.set_title(title, fontsize=14, fontweight='bold', pad=15)
+        title += f" | {extra_info}"
+    fig.suptitle(title, fontsize=13, fontweight='bold', y=0.98)
     
-    # Plot price data
-    ax1.plot(df.index, df['close'], color='#2196F3', linewidth=1.2, label='BTC Close', alpha=0.8)
+    # ---- TOP PANEL: Price - simple clean line ----
+    ax1.plot(df.index, df['close'], color='#333333', linewidth=0.8, label='BTC')
     
-    # Add indicator-specific overlays
-    if indicator_name == 'Keltner' and isinstance(indicator_data, pd.DataFrame):
-        # Plot Keltner channels
-        if 'kc_upper' in indicator_data.columns:
-            ax1.plot(indicator_data.index, indicator_data['kc_upper'], 
-                     color='orange', linewidth=0.8, alpha=0.6, label='KC Upper')
-            ax1.plot(indicator_data.index, indicator_data['kc_lower'], 
-                     color='orange', linewidth=0.8, alpha=0.6, label='KC Lower')
-            ax1.fill_between(indicator_data.index, 
-                           indicator_data['kc_lower'], indicator_data['kc_upper'],
-                           color='orange', alpha=0.1)
-    elif indicator_name == 'Ichimoku' and isinstance(indicator_data, pd.DataFrame):
-        # Plot Ichimoku cloud
-        if 'senkou_span_a' in indicator_data.columns and 'senkou_span_b' in indicator_data.columns:
-            cloud_a = indicator_data['senkou_span_a'].shift(60)
-            cloud_b = indicator_data['senkou_span_b'].shift(60)
-            ax1.fill_between(indicator_data.index, cloud_a, cloud_b,
-                           where=cloud_a >= cloud_b, color='green', alpha=0.15, label='Bullish Cloud')
-            ax1.fill_between(indicator_data.index, cloud_a, cloud_b,
-                           where=cloud_a < cloud_b, color='red', alpha=0.15, label='Bearish Cloud')
-            ax1.plot(indicator_data.index, cloud_a, color='green', linewidth=0.6, alpha=0.5)
-            ax1.plot(indicator_data.index, cloud_b, color='red', linewidth=0.6, alpha=0.5)
-        if 'tenkan_sen' in indicator_data.columns:
-            ax1.plot(indicator_data.index, indicator_data['tenkan_sen'], 
-                     color='blue', linewidth=0.6, alpha=0.5, label='Tenkan')
-        if 'kijun_sen' in indicator_data.columns:
-            ax1.plot(indicator_data.index, indicator_data['kijun_sen'], 
-                     color='red', linewidth=0.6, alpha=0.5, label='Kijun')
-    elif indicator_name == 'Supertrend' and isinstance(indicator_data, pd.DataFrame):
-        # Plot Supertrend line
-        if 'st' in indicator_data.columns:
-            st_values = indicator_data['st']
-            # Color by trend direction
-            colors = np.where(indicator_data['vii'] > 0, 'green', 'red')
-            ax1.plot(indicator_data.index, st_values, color='purple', 
-                     linewidth=1.0, alpha=0.7, label='Supertrend')
-    elif indicator_name == 'MSVR' and isinstance(indicator_data, pd.DataFrame):
-        # Plot MSVR median band
-        if 'median' in indicator_data.columns:
-            ax1.plot(indicator_data.index, indicator_data['median'], 
-                     color='purple', linewidth=0.8, alpha=0.6, label='Median')
-        if 'upper' in indicator_data.columns and 'lower' in indicator_data.columns:
-            ax1.plot(indicator_data.index, indicator_data['upper'], 
-                     color='green', linewidth=0.6, alpha=0.4, label='Upper Band')
-            ax1.plot(indicator_data.index, indicator_data['lower'], 
-                     color='red', linewidth=0.6, alpha=0.4, label='Lower Band')
-            ax1.fill_between(indicator_data.index, 
-                           indicator_data['lower'], indicator_data['upper'],
-                           color='purple', alpha=0.1)
-    
-    # Mark entry/exit points with color based on win/loss
+    # Entry markers (▲ green) - one per trade, period
     for trade in trades:
-        # Entry marker
-        ax1.scatter(trade['entry_date'], trade['entry_price'], 
-                   marker='^', color='#4CAF50', s=120, zorder=5, edgecolors='black', linewidth=0.5)
-        
-        # Exit marker (colored by win/loss)
-        exit_color = '#4CAF50' if trade['is_win'] else '#F44336'
-        ax1.scatter(trade['exit_date'], trade['exit_price'],
-                   marker='v', color=exit_color, s=120, zorder=5, edgecolors='black', linewidth=0.5)
-        
-        # Connect entry/exit with line (colored by win/loss)
-        line_color = '#4CAF50' if trade['is_win'] else '#F44336'
-        ax1.plot([trade['entry_date'], trade['exit_date']], 
-                [trade['entry_price'], trade['exit_price']],
-                color=line_color, linewidth=1.5, alpha=0.5, linestyle='--')
-        
-        # Shade winning trades green, losing trades red
-        if trade['is_win']:
-            ax1.axvspan(trade['entry_date'], trade['exit_date'], 
-                       alpha=0.08, color='green')
-        else:
-            ax1.axvspan(trade['entry_date'], trade['exit_date'], 
-                       alpha=0.08, color='red')
+        ax1.scatter(trade['entry_date'], trade['entry_price'],
+                   marker='^', color='#22c55e', s=60, zorder=10,
+                   edgecolors='#166534', linewidth=0.5, label='_' if trade != trades[0] else 'Entry')
     
-    ax1.set_ylabel('BTC Price (USD)', fontsize=11)
-    ax1.legend(loc='upper left', fontsize=9, ncol=2)
+    # Exit markers (▼ red for loss, ▼ green for win)
+    for trade in trades:
+        color = '#22c55e' if trade['is_win'] else '#ef4444'
+        edge = '#166534' if trade['is_win'] else '#991b1b'
+        ax1.scatter(trade['exit_date'], trade['exit_price'],
+                   marker='v', color=color, s=60, zorder=10,
+                   edgecolors=edge, linewidth=0.5, label='_' if trade != trades[0] else 'Exit')
+    
+    ax1.set_ylabel('Price (USD)', fontsize=10)
     ax1.set_yscale('log')
     ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
-    ax1.grid(True, alpha=0.3)
     
-    # Add holdout boundary
+    # Holdout boundary
     holdout_date = pd.Timestamp('2025-01-01')
-    ax1.axvline(x=holdout_date, color='red', linestyle='--', linewidth=1.5, alpha=0.7)
-    ax1.text(holdout_date, ax1.get_ylim()[1]*0.95, '← Training | Holdout →', 
-             ha='center', fontsize=9, color='red', fontweight='bold',
-             bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='red', alpha=0.8))
+    ax1.axvline(x=holdout_date, color='#ef4444', linestyle='--', linewidth=1, alpha=0.5)
+    ax1.text(holdout_date, ax1.get_ylim()[0]*1.1, 'HOLDOUT',
+             rotation=90, fontsize=8, color='#ef4444', alpha=0.7, va='bottom')
     
-    # Bottom panel: Trade returns bar chart
+    # Simple legend
+    legend_elements = [
+        plt.Line2D([0], [0], color='#333333', linewidth=0.8, label='BTC'),
+        plt.Line2D([0], [0], marker='^', color='w', markerfacecolor='#22c55e', markersize=8, label=f'Entry ({len(trades)})'),
+        plt.Line2D([0], [0], marker='v', color='w', markerfacecolor='#22c55e', markersize=8, label=f'Win ({n_win})'),
+        plt.Line2D([0], [0], marker='v', color='w', markerfacecolor='#ef4444', markersize=8, label=f'Loss ({n_loss})'),
+    ]
+    ax1.legend(handles=legend_elements, loc='upper left', fontsize=8, framealpha=0.9)
+    
+    # ---- BOTTOM PANEL: Trade returns - simple bars ----
     trade_dates = [t['exit_date'] for t in trades]
     trade_returns = [t['return_pct'] for t in trades]
-    trade_colors = ['#4CAF50' if r > 0 else '#F44336' for r in trade_returns]
+    trade_colors = ['#22c55e' if r > 0 else '#ef4444' for r in trade_returns]
     
-    bars = ax2.bar(trade_dates, trade_returns, color=trade_colors, alpha=0.7, width=15)
-    ax2.axhline(y=0, color='black', linewidth=0.5)
-    ax2.set_ylabel('Trade Return (%)', fontsize=11)
-    ax2.set_xlabel('Date', fontsize=11)
-    ax2.grid(True, alpha=0.3)
+    bars = ax2.bar(trade_dates, trade_returns, color=trade_colors, alpha=0.8, width=10)
+    ax2.axhline(y=0, color='#333333', linewidth=0.5)
+    ax2.set_ylabel('Return (%)', fontsize=10)
     
-    # Add value labels on bars
-    for bar, ret_val in zip(bars, trade_returns):
-        height = bar.get_height()
-        ax2.text(bar.get_x() + bar.get_width()/2., height,
-                f'{ret_val:.1f}%', ha='center', va='bottom' if height > 0 else 'top',
-                fontsize=7, fontweight='bold')
+    # Add value labels only for larger bars (avoid clutter)
+    for bar, ret in zip(bars, trade_returns):
+        if abs(ret) > 10:  # Only label big moves
+            h = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., h,
+                    f'{ret:.0f}%', ha='center', va='bottom' if h > 0 else 'top',
+                    fontsize=6, color='#666666')
     
     # Format x-axis
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
-    plt.xticks(rotation=45)
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    ax2.xaxis.set_major_locator(mdates.YearLocator())
     
-    # Add legend
-    win_patch = mpatches.Patch(color='#4CAF50', label=f'Winning Trades ({sum(1 for t in trades if t["is_win"])})')
-    loss_patch = mpatches.Patch(color='#F44336', label=f'Losing Trades ({sum(1 for t in trades if not t["is_win"])})')
-    ax2.legend(handles=[win_patch, loss_patch], loc='upper right', fontsize=9)
-    
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     
     # Save chart
     chart_filename = f"{indicator_name.lower()}_trade_chart.png"
