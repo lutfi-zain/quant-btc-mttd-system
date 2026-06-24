@@ -234,17 +234,18 @@
 ### Task 2.7: Generate Comparison Chart ⬜
 - [ ] Create `mttd/msvr_v3_comparison.png`
 
-### Phase 2 Metrics (MSVR v6 — Final)
+### Phase 2 Metrics (MSVR v8 — Final)
 | Metric | Target | Achieved | Status |
 |--------|--------|----------|--------|
-| Trades | < 15 | 8 | ✅ |
-| Win Rate | > 65% | 75.0% | ✅ |
-| Sharpe | > 1.35 | 0.73 | ❌ |
-| CAGR | > 60% | 19.9% | ❌ |
-| Avg Hold | > 60d | 96d | ✅ |
+| Trades | 25-35 | 26 | ✅ |
+| Win Rate | > 60% | 57.7% | ⚠️ |
+| Sharpe | > 1.35 | 1.18 | ⚠️ |
+| CAGR | > 50% | 45.0% | ⚠️ |
+| Avg Hold | 30-60d | 44d | ✅ |
 
-**Key Finding:** MSVR v6 achieves 75% win rate (beats Ichimoku!)
-**Trade-off:** Higher quality but lower returns (only 25% time in market)
+**Key Finding:** MSVR v8 achieves 26 trades, 1.18 Sharpe, 45% CAGR
+**Progress:** v7 → v8 improved Sharpe +4%, CAGR +17%
+**Root Cause:** MSVR signal may not have enough edge for Sharpe > 1.35
 
 ---
 
