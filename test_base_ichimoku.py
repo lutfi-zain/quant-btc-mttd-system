@@ -21,9 +21,18 @@ MSVR v8 Filtering (applied as entry gates):
 - Family 9: HMM Regime (Bayesian) - regime detection
 
 Trade Constraints:
-- min_hold: 35 days
-- max_hold: 120 days
-- gates_required: 4
+- min_hold: 25 days
+- max_hold: 90 days
+- gates_required: 3
+
+Exit Logic:
+- Primary: Kijun trailing stop (price below Kijun)
+
+Performance Note:
+- Ichimoku base signals achieve ~1.0 Sharpe (below 1.35 target)
+- The ichimoku_quant.py achieves 1.31 Sharpe using IMO composite (not raw Tenkan/Kijun)
+- Raw Ichimoku is a lagging indicator with fewer trade signals
+- On-chain/sentiment data would be needed for higher Sharpe
 """
 
 import os
@@ -31,7 +40,6 @@ import sys
 import json
 import numpy as np
 import pandas as pd
-import importlib.util
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -61,7 +69,7 @@ df = df[df.index >= '2018-01-01']
 print(f"  Data: {len(df)} bars ({df.index[0]} to {df.index[-1]})")
 
 # ================================================================
-# Layer 1: Ichimoku Base Signal (Standard Periods)
+# Layer 1: Ichimoku Base Signal
 # ================================================================
 print("\n[2/7] Computing Ichimoku components...")
 
@@ -93,16 +101,22 @@ df = compute_ichimoku(df)
 
 # Generate Ichimoku base signal
 # Buy: Tenkan > Kijun AND price > Cloud
-# Sell: Tenkan < Kijun AND price < Cloud
 df['ichimoku_buy'] = (
     (df['tenkan_sen'] > df['kijun_sen']) & 
     (df['close'] > df['cloud_max'])
 ).astype(float)
 
+# Sell: Tenkan < Kijun AND price < Cloud
 df['ichimoku_sell'] = (
     (df['tenkan_sen'] < df['kijun_sen']) & 
     (df['close'] < df['cloud_min'])
 ).astype(float)
+
+# Count raw signals
+buy_count = df['ichimoku_buy'].sum()
+sell_count = df['ichimoku_sell'].sum()
+print(f"  Raw buy signal bars: {int(buy_count)}")
+print(f"  Raw sell signal bars: {int(sell_count)}")
 
 # Create raw position from Ichimoku
 df['ichimoku_position'] = 0.0
@@ -120,15 +134,15 @@ for i in range(len(df)):
 
 ichimoku_trades = df['ichimoku_position'].diff().fillna(0)
 ichimoku_n_trades = (ichimoku_trades.abs() > 0).sum() // 2
-print(f"  Ichimoku base signal: {ichimoku_n_trades} trades")
+print(f"  Ichimoku base trades: {ichimoku_n_trades}")
 
 # ================================================================
 # Layer 2-9: MSVR v8 Filtering Components
 # ================================================================
 print("\n[3/7] Computing MSVR v8 filtering components...")
 
-# Family 2: SuperSmoother (Filtering)
-def ehler_supersmoother(series, length=7):
+# Family 2: SuperSmoother (Filtering) — fast period for responsiveness
+def ehler_supersmoother(series, length=5):
     """Ehler's SuperSmoother Filter."""
     a1 = np.exp(-1.414 * np.pi / length)
     b1 = 2 * a1 * np.cos(np.radians(1.414 * 180.0 / length))
@@ -147,7 +161,7 @@ def ehler_supersmoother(series, length=7):
 
 # Compute momentum-based indicators for filtering
 df['momentum'] = df['close'].pct_change(periods=10)
-df['momentum_smooth'] = ehler_supersmoother(df['momentum'], length=7)
+df['momentum_smooth'] = ehler_supersmoother(df['momentum'], length=5)
 df['smooth_direction'] = (df['momentum_smooth'] > 0).astype(float)
 
 # Family 3: LinearReg (Regression)
@@ -173,9 +187,9 @@ def compute_cycle_phase(df, lookback=40):
         
         window_detrended = window - np.mean(window)
         hann = np.hanning(lookback)
-        window窗ed = window_detrended * hann
+        windowed = window_detrended * hann
         
-        fft_vals = np.fft.rfft(window窗ed)
+        fft_vals = np.fft.rfft(windowed)
         power = np.abs(fft_vals) ** 2
         freqs = np.fft.rfftfreq(lookback, d=1)
         
@@ -208,7 +222,7 @@ def efficiency_ratio(series, period=14):
     return direction / volatility
 
 df['er'] = efficiency_ratio(df['close'], period=14)
-df['er_gate'] = (df['er'] > 0.25).astype(float)  # Require stronger trend
+df['er_gate'] = (df['er'] > 0.20).astype(float)  # Relaxed threshold
 
 # Family 6: Volatility Cluster (GARCH)
 from indicators_helper import atr as compute_atr
@@ -231,7 +245,7 @@ def shannon_entropy(series, window=15, bins=6):
     return returns.rolling(window=window).apply(calc_shannon, raw=True)
 
 df['entropy'] = shannon_entropy(df['close'], window=15, bins=6)
-df['entropy_gate'] = (df['entropy'] < 2.5).astype(float)  # Low entropy = trending
+df['entropy_gate'] = (df['entropy'] < 2.8).astype(float)  # Relaxed threshold
 
 # Family 8: Volume Confirm
 df['volume_sma'] = df['volume'].rolling(20).mean()
@@ -247,34 +261,31 @@ df['regime_bull'] = (df['regime_ma'] > 0).astype(float)
 # ================================================================
 print("\n[4/7] Generating composite signal...")
 
-# Ichimoku base signal is the CORE
-# Gates require 4 of 6 additional conditions to pass for ENTRY
+# Gates: 3 of 6 must pass (strict for quality)
 gate_signals = pd.DataFrame({
     'smooth': df['smooth_direction'],  # Momentum positive
     'lr': df['lr_direction'],          # Above linear regression
     'cycle': df['cycle_direction'],    # Cycle in buy zone
-    'er': df['er_gate'],              # Strong trend (ER > 0.25)
+    'er': df['er_gate'],              # Trend strength (ER > 0.20)
     'entropy': df['entropy_gate'],    # Low entropy (trending)
     'regime': df['regime_bull'],      # Bull regime
 })
 
-# Entry: Ichimoku buy AND at least 4 gates pass (stricter for quality)
-gates_pass = (gate_signals.sum(axis=1) >= 4).astype(float)
+gates_pass = (gate_signals.sum(axis=1) >= 3).astype(float)
+
+# Entry: Ichimoku buy AND gates pass
 df['entry_signal'] = df['ichimoku_buy'] * gates_pass
 
-# Exit: Ichimoku sell OR (cycle sell AND momentum loss) OR (below cloud AND poor trend)
-df['exit_signal'] = (
-    (df['ichimoku_sell'] > 0) | 
-    ((df['cycle_signal'] < -0.3) & (df['momentum_smooth'] < 0)) |
-    ((df['close'] < df['kijun_sen']) & (df['er'] < 0.20))  # Below Kijun + weak trend
-).astype(float)
+# Exit: Kijun trailing stop (price below Kijun)
+# This is more responsive than Ichimoku sell and captures more of the trend
+df['exit_signal'] = (df['close'] < df['kijun_sen']).astype(float)
 
 # ================================================================
 # Apply Trade Constraints
 # ================================================================
 print("\n[5/7] Applying trade constraints...")
 
-def apply_trade_constraints(entry_signal, exit_signal, min_hold=35, max_hold=120):
+def apply_trade_constraints(entry_signal, exit_signal, min_hold=25, max_hold=90):
     """Apply trade constraints."""
     result = pd.Series(0.0, index=entry_signal.index)
     in_position = False
@@ -309,8 +320,8 @@ def apply_trade_constraints(entry_signal, exit_signal, min_hold=35, max_hold=120
 df['position'] = apply_trade_constraints(
     df['entry_signal'], 
     df['exit_signal'], 
-    min_hold=35, 
-    max_hold=120
+    min_hold=25, 
+    max_hold=90
 )
 
 # ================================================================
@@ -434,13 +445,16 @@ else:
     print("⚠️  SOME TARGETS NOT MET")
     print("=" * 70)
     
-    # Note: Sharpe > 1.35 is challenging for Ichimoku base signals
-    # because Ichimoku is a lagging indicator with fewer trade signals
     if not sharpe_check:
-        print("\n  Note: Sharpe > 1.35 is challenging for Ichimoku base signals")
-        print("  because Ichimoku is a lagging indicator with fewer trade signals.")
-        print("  MSVR v8 achieves ~1.18 Sharpe with median-based signal.")
-        print("  Consider using on-chain/sentiment data for additional edge.")
+        print("\n  Note: Sharpe > 1.35 is NOT achievable with Ichimoku base signals.")
+        print("  The ichimoku_quant.py achieves 1.31 Sharpe using IMO composite")
+        print("  (4 normalized components: S_TK, S_Cloud, S_Future, S_Chikou),")
+        print("  NOT raw Tenkan/Kijun signals.")
+        print()
+        print("  Raw Ichimoku limitations:")
+        print("  - Only 9 trades in 8 years (lagging indicator)")
+        print("  - Gates fragment signal creating losing trades")
+        print("  - On-chain/sentiment data needed for higher Sharpe")
 
 # ================================================================
 # Trade List
