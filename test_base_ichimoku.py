@@ -20,16 +20,20 @@ MSVR v8 Filtering (applied as entry gates):
 - Family 8: Volume Confirm (Volume) - volume confirmation
 - Family 9: HMM Regime (Bayesian) - regime detection
 
+Enhancement: Ichimoku composite components (S_TK, S_Cloud, S_Future, S_Chikou)
+used as additional quality filters to improve signal timing.
+
 Trade Constraints:
 - min_hold: 25 days
 - max_hold: 90 days
 - gates_required: 3
 
 Exit Logic:
-- Primary: Kijun trailing stop (price below Kijun)
+- Primary: Kijun trailing stop (traditional)
+- Secondary: IMO momentum deterioration (quality-based)
 
 Performance Note:
-- Ichimoku base signals achieve ~1.0 Sharpe (below 1.35 target)
+- Ichimoku base signals achieve ~0.93 Sharpe (below 1.35 target)
 - The ichimoku_quant.py achieves 1.31 Sharpe using IMO composite (not raw Tenkan/Kijun)
 - Raw Ichimoku is a lagging indicator with fewer trade signals
 - On-chain/sentiment data would be needed for higher Sharpe
@@ -69,15 +73,39 @@ df = df[df.index >= '2018-01-01']
 print(f"  Data: {len(df)} bars ({df.index[0]} to {df.index[-1]})")
 
 # ================================================================
-# Layer 1: Ichimoku Base Signal
+# Layer 1: Ichimoku Base Signal with IMO
 # ================================================================
 print("\n[2/7] Computing Ichimoku components...")
 
-def compute_ichimoku(df, p1=20, p2=60, p3=120):
+def ehler_supersmoother(series, length=7):
+    """Ehler's SuperSmoother Filter."""
+    a1 = np.exp(-1.414 * np.pi / length)
+    b1 = 2 * a1 * np.cos(np.radians(1.414 * 180.0 / length))
+    c2 = b1
+    c3 = -a1 * a1
+    c1 = 1 - c2 - c3
+
+    vals = series.ffill().fillna(0).values
+    filt = np.zeros(len(vals))
+    filt[0] = vals[0]
+    if len(vals) > 1:
+        filt[1] = vals[1]
+    for i in range(2, len(vals)):
+        filt[i] = c1 * (vals[i] + vals[i-1]) / 2 + c2 * filt[i-1] + c3 * filt[i-2]
+    return pd.Series(filt, index=series.index)
+
+def compute_ichimoku_full(df, p1=20, p2=60, p3=120):
     """
-    Compute Ichimoku components with standard periods.
+    Compute Ichimoku with all components including IMO.
     """
     df = df.copy()
+    
+    # ATR for normalization
+    tr1 = df['high'] - df['low']
+    tr2 = (df['high'] - df['close'].shift(1)).abs()
+    tr3 = (df['low'] - df['close'].shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    df['ATR'] = tr.rolling(window=14).mean()
     
     # Base Ichimoku lines
     df['tenkan_sen'] = (df['high'].rolling(p1).max() + df['low'].rolling(p1).min()) / 2
@@ -95,9 +123,33 @@ def compute_ichimoku(df, p1=20, p2=60, p3=120):
     df['cloud_max'] = np.maximum(df['senkou_span_a'], df['senkou_span_b'])
     df['cloud_min'] = np.minimum(df['senkou_span_a'], df['senkou_span_b'])
     
+    # Normalized components (tanh -> bounded [-1, 1])
+    # S_TK: Tenkan-Kijun momentum
+    df['S_TK'] = np.tanh((df['tenkan_sen'] - df['kijun_sen']) / df['ATR'])
+    
+    # S_Cloud: Distance from cloud
+    dist_cloud = np.zeros(len(df))
+    above = df['close'] > df['cloud_max']
+    below = df['close'] < df['cloud_min']
+    dist_cloud[above] = (df['close'] - df['cloud_max'])[above] / df['ATR'][above]
+    dist_cloud[below] = (df['close'] - df['cloud_min'])[below] / df['ATR'][below]
+    df['S_Cloud'] = np.tanh(dist_cloud)
+    
+    # S_Future: Future cloud direction
+    df['S_Future'] = np.tanh((df['senkou_span_a_raw'] - df['senkou_span_b_raw']) / df['ATR'])
+    
+    # S_Chikou: Chikou span momentum (smoothed)
+    raw_chikou_dist = (df['close'] - df['close'].shift(p2)) / df['ATR']
+    df['S_Chikou'] = np.tanh(ehler_supersmoother(raw_chikou_dist, length=4))
+    
+    # Composite IMO (used for quality filtering and exit)
+    imo_raw = (df['S_TK'] + df['S_Cloud'] + df['S_Future'] + df['S_Chikou']) / 4.0
+    df['IMO'] = ehler_supersmoother(imo_raw, length=7)
+    df['IMO_Std'] = df['IMO'].rolling(30).std()
+    
     return df
 
-df = compute_ichimoku(df)
+df = compute_ichimoku_full(df)
 
 # Generate Ichimoku base signal
 # Buy: Tenkan > Kijun AND price > Cloud
@@ -135,6 +187,7 @@ for i in range(len(df)):
 ichimoku_trades = df['ichimoku_position'].diff().fillna(0)
 ichimoku_n_trades = (ichimoku_trades.abs() > 0).sum() // 2
 print(f"  Ichimoku base trades: {ichimoku_n_trades}")
+print(f"  IMO mean during positions: {df.loc[df['ichimoku_position']==1, 'IMO'].mean():.3f}")
 
 # ================================================================
 # Layer 2-9: MSVR v8 Filtering Components
@@ -142,23 +195,6 @@ print(f"  Ichimoku base trades: {ichimoku_n_trades}")
 print("\n[3/7] Computing MSVR v8 filtering components...")
 
 # Family 2: SuperSmoother (Filtering) — fast period for responsiveness
-def ehler_supersmoother(series, length=5):
-    """Ehler's SuperSmoother Filter."""
-    a1 = np.exp(-1.414 * np.pi / length)
-    b1 = 2 * a1 * np.cos(np.radians(1.414 * 180.0 / length))
-    c2 = b1
-    c3 = -a1 * a1
-    c1 = 1 - c2 - c3
-
-    vals = series.ffill().fillna(0).values
-    filt = np.zeros(len(vals))
-    filt[0] = vals[0]
-    if len(vals) > 1:
-        filt[1] = vals[1]
-    for i in range(2, len(vals)):
-        filt[i] = c1 * (vals[i] + vals[i-1]) / 2 + c2 * filt[i-1] + c3 * filt[i-2]
-    return pd.Series(filt, index=series.index)
-
 # Compute momentum-based indicators for filtering
 df['momentum'] = df['close'].pct_change(periods=10)
 df['momentum_smooth'] = ehler_supersmoother(df['momentum'], length=5)
@@ -276,9 +312,18 @@ gates_pass = (gate_signals.sum(axis=1) >= 3).astype(float)
 # Entry: Ichimoku buy AND gates pass
 df['entry_signal'] = df['ichimoku_buy'] * gates_pass
 
-# Exit: Kijun trailing stop (price below Kijun)
-# This is more responsive than Ichimoku sell and captures more of the trend
-df['exit_signal'] = (df['close'] < df['kijun_sen']).astype(float)
+# Exit: Use IMO-based exit (more responsive than Kijun)
+# Exit when IMO drops below adaptive threshold
+df['IMO_Std'] = df['IMO'].rolling(30).std()
+df['imo_exit_threshold'] = df['IMO_Std'] * 0.4  # Adaptive threshold
+df['imo_exit_signal'] = (df['IMO'] < df['imo_exit_threshold']).astype(float)
+
+# Also exit on Kijun trailing stop
+df['kijun_exit'] = (df['close'] < df['kijun_sen']).astype(float)
+
+# Combined exit: IMO momentum deterioration OR Kijun break
+# But only after min_hold
+df['exit_signal'] = ((df['imo_exit_signal'] == 1) | (df['kijun_exit'] == 1)).astype(float)
 
 # ================================================================
 # Apply Trade Constraints
@@ -286,7 +331,7 @@ df['exit_signal'] = (df['close'] < df['kijun_sen']).astype(float)
 print("\n[5/7] Applying trade constraints...")
 
 def apply_trade_constraints(entry_signal, exit_signal, min_hold=25, max_hold=90):
-    """Apply trade constraints."""
+    """Apply trade constraints with responsive exit."""
     result = pd.Series(0.0, index=entry_signal.index)
     in_position = False
     hold_count = 0
