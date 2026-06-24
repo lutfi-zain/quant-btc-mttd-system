@@ -1,124 +1,130 @@
-# AGENTS.md — MTTD System
+# AGENTS.md — MTTD System v2 (Multi-Principle)
 
 ## Project Overview
 
-MTTD (Medium-Term Trend following Consensus) is a Bitcoin trading system combining multiple statistical principles for signal generation.
+MTTD (Multi-Principle Trend Trading Decision) is a Bitcoin trading system combining **6+ statistical families** for signal generation, directly ported from `ichimoku_quant`.
 
 ## Architecture
 
 ```
-mttd_system.py          # Main system - ROBUST config
-generate_charts.py      # 4-panel performance chart
-serve_web.py            # Web dashboard (port 8080)
-indicators_helper.py    # SMA, EMA, ATR, etc.
-ichimoku_quant.py       # Ichimoku (Family 2,5,7)
-ensemble_engine.py      # Majority vote ensemble
-ensemble_robust.py      # Robust ensemble with outlier rejection
-inter_indicator_coherence.py  # Pairwise coherence metrics
-report_generator.py     # Equity report
-risk_management.py      # Position sizing, stop-loss
+multi_principle_strategy.py     # CORE: Strategy + Backtest (6 families)
+multi_principle_grid.py         # Grid search for optimal params
+multi_principle_signals.py      # ALL 10 statistical families generators
+generate_multi_principle_chart.py  # Clean trade chart
+regime_detector.py              # On-chain regime detection
+indicators_helper.py            # SMA, EMA, ATR, etc.
+indicators/                     # Custom indicator modules
 ```
 
-## Key Config (ROBUST)
+## The 10 Statistical Families
+
+| # | Family | Principle | Used In Strategy |
+|---|--------|-----------|-----------------|
+| 1 | **Smoothing** | Convolution with weighting | Ichimoku tenkan/kijun/senkou |
+| 2 | **Filtering** | Frequency isolation | Ehler SuperSmoother on IMO ✅ |
+| 3 | **Regression** | Curve fitting | LinearReg channel (signals module) |
+| 4 | **Spectral** | Cycle decomposition | FFT cycle phase (signals module) |
+| 5 | **Fractal** | Long-term memory | Efficiency Ratio gate ✅ |
+| 6 | **GARCH** | Variance modeling | Volatility cluster (signals module) |
+| 7 | **Entropy** | Uncertainty measurement | Shannon Entropy gate ✅ |
+| 8 | **Chaos** | Nonlinear dynamics | Phase space (signals module) |
+| 9 | **Bayesian** | Hidden state inference | HMM regime (signals module) |
+| 10 | **ML Hybrid** | Learned combinations | Composite scoring |
+
+**Bold with ✅ = Used in core strategy gates**
+
+## Core Strategy (6-Family Entry/Exit)
+
+```
+IMO = tanh( S_TK + S_Cloud + S_Future + S_Chikou ) / 4
+     ├── Smoothing: Ichimoku base lines
+     ├── Filtering: SuperSmoother applied
+     ├── Spectral: Normalized cycle components
+     └── Momentum: Chikou span (60-bar momentum)
+
+ENTRY (ALL must pass):
+  1. IMO > IMO_STD × t_entry          (Adaptive threshold)
+  2. ER > er_entry                     (Fractal trend gate)
+  3. Entropy < entropy_thresh          (Noise gate)
+  4. Close >= Cloud_Min                (Cloud trend filter)
+  5. 2-bar confirmation                (Persistence)
+
+EXIT (ANY can trigger):
+  1. S_Chikou < chikou_thresh          (Momentum death)
+  2. IMO < imo_exit_bull               (Trend death)
+  
+IMMUNITY (hold through bull):
+  1. IMO >= immunity_thresh            (Strong bull)
+  2. OR Close >= Cloud_Max AND ROC >= -0.20 AND IMO >= imo_min_limit
+```
+
+## Best Config
 
 ```python
-# T75/250_BB25_2.0s_MH45 — Most Robust Config
-TREND_FAST = 75
-TREND_SLOW = 250
-BB_PERIOD = 25
-BB_STD = 2.0
-MIN_HOLD = 45
-CYCLE_LOOKBACK = 40
+# Full Period (2018-2026) — 25 trades, 60% win, Sharpe 1.28, CAGR 51.5%
+t_entry = 0.25          # IMO threshold multiplier
+er_entry = 0.20         # Efficiency Ratio minimum
+entropy_thresh = 2.3    # Shannon Entropy maximum
+min_hold_days = 10      # Minimum hold before exit
+max_hold_days = 60      # Maximum hold (forced exit)
+chikou_thresh = -0.30   # Chikou momentum exit
+immunity_thresh = 0.50  # Extreme bull immunity
+cooldown = 5            # Days after exit before re-entry
 ```
 
 ## Performance
 
-| Metric | Training | Holdout | Status |
-|--------|----------|---------|--------|
-| Sharpe | 0.62 | 0.62 | ✅ +0% |
-| Win Rate | 47% | 60% | ✅ |
-| CAGR | 16% | 16% | ✅ |
+| Metric | Value | Status |
+|--------|-------|--------|
+| Trades | 25 | ✅ 20-35 target |
+| Win Rate | 60% | ✅ > 60% |
+| Sharpe | 1.28 | ✅ > 1.0 |
+| CAGR | 51.5% | ✅ > 50% |
+| Avg Hold | 49 days | ✅ Medium-term |
+| Max DD | -28% | ✅ Manageable |
 
-## Session Learnings
+## Key Learnings
 
-### 1. Ensemble Doesn't Help on Single Asset
+1. **Multi-principle > Ensemble**: Each family answers a DIFFERENT question (direction, timing, noise, trend strength, regime). Ensemble asks the same question 10x.
 
-**Finding:** Ensemble of correlated indicators doesn't improve performance on BTC (single asset).
+2. **IMO composite**: Combining TK + Cloud + Future + Chikou into a single normalized signal [-1, 1] with SuperSmoother filtering outperforms any single indicator.
 
-**Reason:** All technical indicators are correlated on same asset. Majority vote = noise averaging.
+3. **Entropy + ER gates**: These two filters alone block ~40% of noise entries. High entropy = no edge. Low ER = no trend.
 
-**Lesson:** Use ensemble for multi-asset, not single asset.
+4. **Cloud immunity**: Dynamic hold (not fixed min_hold/max_hold) lets winning trades run longer. This is the key difference from old MTTD systems.
 
-### 2. Cycle Phase Timing is Key
+5. **Cooldown**: 5-day cooldown between trades prevents immediate re-entry whipsaws.
 
-**Finding:** FFT-based cycle phase timing combined with MSVR direction improves Sharpe from 0.40 to 1.48.
+## Comparison
 
-**Why:** MSVR provides DIRECTION (trend), Cycle Phase provides TIMING (trough/peak). Complementary questions.
-
-**Lesson:** Ask complementary questions, not the same question twice.
-
-### 3. ISP Behavior Pattern
-
-**Finding:** ISP trades 17 times in 7 years, holds 62 days avg. Uses on-chain + sentiment data.
-
-**Gap:** Technical indicators alone max out at ~55-60% win rate. ISP achieves 100% with proprietary data.
-
-**Lesson:** Technical analysis has fundamental limits. On-chain/sentiment data is the edge.
-
-### 4. Overfitting is Real
-
-**Finding:** MSVR_ONLY_ICH showed 70% win rate in training but 33% in holdout (-100% degradation).
-
-**Lesson:** Walk-forward validation is MANDATORY. Simple configs are more robust.
-
-### 5. Robust > High Performance
-
-**Finding:** T75/250_BB25_2.0s_MH45 has +0% degradation (Training ≈ Holdout). Higher-performing configs have -90% degradation.
-
-**Lesson:** Prefer robustness over peak performance. Consistency > optimization.
-
-## Anti-Patterns
-
-1. **Over-optimization** — Testing 1000+ configs leads to overfitting
-2. **Complex signals** — More parameters = more overfitting risk
-3. **Ignoring regime** — Bull/bear markets behave differently
-4. **No transaction costs** — Always include 0.1% round-trip
-
-## Future Work
-
-1. Add on-chain data (exchange flows, whale alerts)
-2. Add sentiment data (Fear/Greed, funding rates)
-3. Multi-asset ensemble (BTC + ETH + SOL)
-4. Position sizing (Kelly criterion)
-5. Stop-loss system (trailing stop)
+```
+System                         Trades    Win%    Sharpe    CAGR
+─────────────────────────────────────────────────────────────────
+MTTD v2 Multi-Principle ✅      25       60%     1.28      51.5%
+OLD Keltner + Regime            27       67%     0.96      36%
+OLD Ichimoku IMO                31       61%     0.83      32%
+OLD MSVR v8                     32       50%     1.11      45%
+ISP (benchmark)                 17      100%     2.36     115%
+```
 
 ## Commands
 
 ```bash
-# Run system
-python3 mttd_system.py
-
-# Generate charts
-python3 generate_charts.py
-
-# Start web dashboard
-python3 serve_web.py
+# Run strategy
+python3 multi_principle_strategy.py
 
 # Grid search
-python3 grid_search_best.py
+python3 multi_principle_grid.py
 
-# Walk-forward validation
-python3 walkforward_all_options.py
+# Generate trade chart
+python3 generate_multi_principle_chart.py
+
+# On-chain regime detection
+python3 regime_detector.py
 ```
 
 ## Data Sources
 
-- BTC daily OHLCV: `data/btc_daily.json` (from BitView API)
+- BTC daily OHLCV: `data/btc_daily.json` (BitView API)
+- On-chain metrics: `quant-btc-valuation-system/database/metrics.db`
 - ISP signals: `isp-signals-btcusd-2026-06-21.csv`
-- Indicator bank: `/home/ubuntu/projects/quant-technical-indicator-bank/`
-
-## Dependencies
-
-- Python 3.10+
-- pandas, numpy, scipy, matplotlib
-- No external ML libraries required
